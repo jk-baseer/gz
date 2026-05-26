@@ -10,43 +10,80 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY: ghcr.io
-  # e.g. ghcr.io/your-github-org
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
 
 jobs:
-  # ── 1. Build & push all service images ────────────────────────────────────
-  build:
-    name: Build images
+  # ── 1. Tests (must pass before anything else) ──────────────────────────────
+  test:
+    name: Test
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gz
+          POSTGRES_PASSWORD: gz
+          POSTGRES_DB: gz_ads
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://gz:gz@localhost:5432/gz_ads
+      REDIS_URL: redis://localhost:6379
+      PUBLIC_HOSTNAME: localhost:8080
+      JWT_SECRET: ci-test-secret
+      CLICKHOUSE_URL: http://localhost:8123
+      CLICKHOUSE_DB: gz
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --all
+
+  # ── 2. Build & push images (parallel per service) ─────────────────────────
+  build:
+    name: Build ${{ matrix.service.bin }}
+    runs-on: ubuntu-latest
+    needs: test   # don't build if tests fail
 
     permissions:
       contents: read
-      packages: write   # needed to push to ghcr.io
+      packages: write
 
     strategy:
       matrix:
         service:
-          - { bin: bidder,         tag: gz-bidder   }
-          - { bin: campaign-api,   tag: gz-api       }
-          - { bin: pacing,         tag: gz-pacing    }
-          - { bin: event-consumer, tag: gz-events    }
+          - { bin: bidder,         tag: gz-bidder  }
+          - { bin: campaign-api,   tag: gz-api      }
+          - { bin: pacing,         tag: gz-pacing   }
+          - { bin: event-consumer, tag: gz-events   }
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Build and push ${{ matrix.service.bin }}
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
@@ -55,27 +92,25 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}/${{ matrix.service.tag }}:latest
             ${{ env.IMAGE_PREFIX }}/${{ matrix.service.tag }}:${{ github.sha }}
-          # Layer cache stored in the registry — keeps rebuilds fast
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.tag }}:cache
           cache-to:   type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.tag }}:cache,mode=max
 
-  # ── 2. Deploy to server ────────────────────────────────────────────────────
+  # ── 3. Deploy to server ────────────────────────────────────────────────────
   deploy:
-    name: Deploy to server
+    name: Deploy
     runs-on: ubuntu-latest
-    needs: build   # wait for all images to be pushed
+    needs: build   # all four images must be pushed first
 
-    environment: production   # optional: require manual approval in GitHub UI
+    # Remove the 'environment: production' line if you don't want manual approval
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Write .env to server and restart services
-        uses: appleboy/ssh-action@v1
+      - uses: appleboy/ssh-action@v1
         env:
-          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
-          GIT_SHA: ${{ github.sha }}
-          # ── Secrets you add in GitHub → Settings → Secrets ────────────────
+          IMAGE_PREFIX:           ${{ env.IMAGE_PREFIX }}
+          GIT_SHA:                ${{ github.sha }}
           POSTGRES_PASSWORD:      ${{ secrets.POSTGRES_PASSWORD }}
           REDIS_PASSWORD:         ${{ secrets.REDIS_PASSWORD }}
           JWT_SECRET:             ${{ secrets.JWT_SECRET }}
@@ -84,20 +119,19 @@ jobs:
           STRIPE_SECRET_KEY:      ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET:  ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           LOG_LEVEL:              ${{ vars.LOG_LEVEL }}
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
         with:
-          host:        ${{ secrets.DEPLOY_HOST }}
-          username:    ${{ secrets.DEPLOY_USER }}
-          key:         ${{ secrets.DEPLOY_SSH_KEY }}
-          envs:        IMAGE_PREFIX,GIT_SHA,POSTGRES_PASSWORD,REDIS_PASSWORD,JWT_SECRET,BID_DOMAIN,APP_DOMAIN,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,LOG_LEVEL
+          host:     ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          envs:     IMAGE_PREFIX,GIT_SHA,POSTGRES_PASSWORD,REDIS_PASSWORD,JWT_SECRET,BID_DOMAIN,APP_DOMAIN,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,LOG_LEVEL,CLOUDFLARE_TUNNEL_TOKEN
           script: |
             set -e
             cd /opt/gz
 
-            # Pull latest code (nginx config, compose file, etc.)
             git fetch --quiet origin main
             git reset --hard origin/main
 
-            # Write the .env that docker-compose reads
             cat > docker/.env <<EOF
             POSTGRES_USER=gz
             POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -106,32 +140,24 @@ jobs:
             JWT_SECRET=${JWT_SECRET}
             BID_DOMAIN=${BID_DOMAIN}
             APP_DOMAIN=${APP_DOMAIN}
+            PUBLIC_HOSTNAME=${BID_DOMAIN}
             STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
             STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
             CLICKHOUSE_DB=gz
             LOG_LEVEL=${LOG_LEVEL:-info}
             IMAGE_PREFIX=${IMAGE_PREFIX}
+            CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
             EOF
 
-            # Log in to ghcr.io on the server (uses a read-only deploy token)
             echo "${{ secrets.GHCR_PULL_TOKEN }}" | \
               docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Pull the exact images built from this commit
             docker compose -f docker/docker-compose.prod.yml pull \
               bidder campaign-api pacing event-consumer
 
-            # Rolling restart: databases and proxy never go down
             docker compose -f docker/docker-compose.prod.yml up -d \
-              --no-build \
-              --remove-orphans
+              --no-build --remove-orphans
 
-            # Run any new migrations (idempotent)
-            docker compose -f docker/docker-compose.prod.yml run --rm \
-              campaign-api /usr/local/bin/migrate || true
-
-            # Brief smoke-check
             sleep 5
-            docker compose -f docker/docker-compose.prod.yml ps | grep -E "Up|running"
-
-            echo "Deploy of ${GIT_SHA} complete"
+            docker compose -f docker/docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}"
+            echo "Deployed ${GIT_SHA}"

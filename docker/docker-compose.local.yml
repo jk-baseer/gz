@@ -1,0 +1,186 @@
+# Local full-stack compose — runs everything on your Mac.
+# Includes Cloudflare Tunnel so exchanges can reach your bidder over HTTPS.
+#
+# Quick start (no Cloudflare account needed):
+#   docker compose -f docker/docker-compose.local.yml up
+#
+# The cloudflared service prints a line like:
+#   https://xyz-abc-123.trycloudflare.com
+# That is your PUBLIC bidder URL — give it to the exchange as:
+#   https://xyz-abc-123.trycloudflare.com/bid/arabyads
+#
+# Dashboard is available locally at http://localhost:8081
+#
+# To use your own Cloudflare domain instead of *.trycloudflare.com:
+#   Set CLOUDFLARE_TUNNEL_TOKEN in .env (get it from Cloudflare Zero Trust → Tunnels)
+#   Then the tunnel URL becomes bid.gz-ads.com automatically.
+
+version: "3.9"
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://gz:gz@postgres/gz_ads
+  REDIS_URL: redis://redis:6379
+  PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-localhost:8080}
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
+  JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_DB: gz
+
+services:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    <<: *restart
+    environment:
+      POSTGRES_USER: gz
+      POSTGRES_PASSWORD: gz
+      POSTGRES_DB: gz_ads
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    <<: *restart
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    <<: *restart
+    ports:
+      - "8123:8123"
+    volumes:
+      - ch_data:/var/lib/clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ── Application services ────────────────────────────────────────────────────
+
+  bidder:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: bidder
+    <<: *restart
+    environment:
+      <<: *app-env
+      BIDDER_HOST: 0.0.0.0
+      BIDDER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  campaign-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: campaign-api
+    <<: *restart
+    environment:
+      <<: *app-env
+      API_HOST: 0.0.0.0
+      API_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pacing:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: pacing
+    <<: *restart
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+
+  event-consumer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: event-consumer
+    <<: *restart
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:   { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+
+  # ── Cloudflare Tunnel ───────────────────────────────────────────────────────
+  #
+  # Mode 1 — Quick tunnel (no account, random *.trycloudflare.com URL):
+  #   Just run as-is. URL prints in the logs.
+  #
+  # Mode 2 — Named tunnel (your own domain, persistent URL):
+  #   Set CLOUDFLARE_TUNNEL_TOKEN in .env
+  #   Get token: Cloudflare Zero Trust → Networks → Tunnels → Create tunnel
+  #   Configure ingress in Cloudflare dashboard:
+  #     bid.gz-ads.com  → http://bidder:8080
+  #     app.gz-ads.com  → http://campaign-api:8081
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    <<: *restart
+    # Quick tunnel points at the bidder. Switch to --token if you have one.
+    command: >
+      sh -c '
+        if [ -n "$$CLOUDFLARE_TUNNEL_TOKEN" ]; then
+          cloudflared tunnel --no-autoupdate run --token $$CLOUDFLARE_TUNNEL_TOKEN
+        else
+          echo "Starting quick tunnel (*.trycloudflare.com) — no account needed"
+          cloudflared tunnel --no-autoupdate --url http://bidder:8080
+        fi
+      '
+    environment:
+      CLOUDFLARE_TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      bidder: { condition: service_healthy }
+
+volumes:
+  pg_data:
+  ch_data:
