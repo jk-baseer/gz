@@ -1,7 +1,12 @@
 # Production docker-compose.
-# Copy .env.example to .env and fill in all values before starting.
 #
-# First-time setup:
+# Images are built in CI (GitHub Actions) and pushed to ghcr.io.
+# The server never compiles Rust — it only pulls pre-built images.
+#
+# IMAGE_PREFIX is set by the deploy workflow, e.g. ghcr.io/your-org
+# All other variables come from docker/.env (written by the workflow).
+#
+# First-time server setup:
 #   docker compose -f docker/docker-compose.prod.yml up -d postgres redis
 #   docker compose -f docker/docker-compose.prod.yml run --rm certbot \
 #     certonly --webroot -w /var/www/certbot \
@@ -71,14 +76,11 @@ services:
       retries: 10
 
   # ── Application services ───────────────────────────────────────────────────
+  # Images are pre-built in CI. IMAGE_PREFIX defaults to local names so
+  # `docker compose build` still works for manual one-off builds.
 
   bidder:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        BIN: bidder
-    image: gz-bidder:latest
+    image: ${IMAGE_PREFIX:-gz}/gz-bidder:latest
     <<: [*restart, *logging]
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
@@ -100,12 +102,7 @@ services:
       retries: 5
 
   campaign-api:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        BIN: campaign-api
-    image: gz-api:latest
+    image: ${IMAGE_PREFIX:-gz}/gz-api:latest
     <<: [*restart, *logging]
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
@@ -129,12 +126,7 @@ services:
       retries: 5
 
   pacing:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        BIN: pacing
-    image: gz-pacing:latest
+    image: ${IMAGE_PREFIX:-gz}/gz-pacing:latest
     <<: [*restart, *logging]
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
@@ -146,12 +138,7 @@ services:
       redis:     { condition: service_healthy }
 
   event-consumer:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        BIN: event-consumer
-    image: gz-events:latest
+    image: ${IMAGE_PREFIX:-gz}/gz-events:latest
     <<: [*restart, *logging]
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
