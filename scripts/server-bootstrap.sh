@@ -3,7 +3,7 @@
 # It installs Docker, clones the repo, and starts the stack.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/gz/main/scripts/server-bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/jk-baseer/gz/main/scripts/server-bootstrap.sh | bash
 #
 # Or after cloning:
 #   bash scripts/server-bootstrap.sh
@@ -23,7 +23,7 @@ fi
 # ── 2. Clone repo ─────────────────────────────────────────────────────────────
 if [ ! -d "$REPO_DIR" ]; then
   echo "Cloning repo to $REPO_DIR ..."
-  git clone https://github.com/YOUR_ORG/gz "$REPO_DIR"
+  git clone https://github.com/jk-baseer/gz "$REPO_DIR"
 else
   echo "Repo already at $REPO_DIR"
 fi

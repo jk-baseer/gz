@@ -501,7 +501,7 @@ Uses Docker Compose + nginx + Certbot (Let's Encrypt). All services run as Docke
 
 ```bash
 # 1. Clone the repo
-git clone ... && cd gz
+git clone git@github.com:jk-baseer/gz.git && cd gz
 
 # 2. Copy and fill the prod env file
 cp .env.example docker/.env
