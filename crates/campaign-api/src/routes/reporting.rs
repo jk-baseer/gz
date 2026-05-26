@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -14,8 +14,18 @@ use crate::{models::{CampaignReport, DailyStats}, state::AppState};
 
 #[derive(Deserialize)]
 pub struct ReportQuery {
-    from: DateTime<Utc>,
-    to: DateTime<Utc>,
+    /// "YYYY-MM-DD" or full ISO-8601
+    from: String,
+    to: String,
+}
+
+fn parse_date(s: &str) -> Option<DateTime<Utc>> {
+    // Try full ISO-8601 first, then date-only (treat as start of day UTC)
+    s.parse::<DateTime<Utc>>().ok().or_else(|| {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
+            .and_then(|d| d.and_hms_opt(0, 0, 0))
+            .map(|dt| Utc.from_utc_datetime(&dt))
+    })
 }
 
 pub async fn campaign_report(
@@ -23,18 +33,24 @@ pub async fn campaign_report(
     Path(campaign_id): Path<Uuid>,
     Query(q): Query<ReportQuery>,
 ) -> impl IntoResponse {
+    let (Some(from), Some(to)) = (parse_date(&q.from), parse_date(&q.to)) else {
+        return (StatusCode::BAD_REQUEST, "invalid date format, use YYYY-MM-DD").into_response();
+    };
+    // `to` is inclusive end-of-day: advance by 1 day
+    let to_exclusive = to + chrono::Duration::days(1);
+
     // ── Totals ────────────────────────────────────────────────────────────────
     let totals = sqlx::query(
         r#"
         SELECT
-            COUNT(*)                                AS impressions,
-            COALESCE(SUM(clearing_price_cents), 0)  AS spend_cents
+            COUNT(*)                                        AS impressions,
+            COALESCE(SUM(clearing_price_cents), 0)::BIGINT  AS spend_cents
         FROM impression_events
         WHERE campaign_id = $1
           AND created_at >= $2 AND created_at < $3
         "#,
     )
-    .bind(campaign_id).bind(q.from).bind(q.to)
+    .bind(campaign_id).bind(from).bind(to_exclusive)
     .fetch_one(&state.pg).await;
 
     let Ok(totals) = totals else {
@@ -48,17 +64,17 @@ pub async fn campaign_report(
         "SELECT COUNT(*) AS clicks FROM click_events
          WHERE campaign_id = $1 AND created_at >= $2 AND created_at < $3",
     )
-    .bind(campaign_id).bind(q.from).bind(q.to)
+    .bind(campaign_id).bind(from).bind(to_exclusive)
     .fetch_one(&state.pg).await
     .ok().and_then(|r| r.try_get("clicks").ok()).unwrap_or(0);
 
     let (conversions, conversion_value_cents): (i64, i64) = sqlx::query(
         r#"SELECT COUNT(*) AS conversions,
-                  COALESCE(SUM(value_cents), 0) AS conversion_value_cents
+                  COALESCE(SUM(value_cents), 0)::BIGINT AS conversion_value_cents
            FROM conversion_events
            WHERE campaign_id = $1 AND created_at >= $2 AND created_at < $3"#,
     )
-    .bind(campaign_id).bind(q.from).bind(q.to)
+    .bind(campaign_id).bind(from).bind(to_exclusive)
     .fetch_one(&state.pg).await
     .map(|r| (
         r.try_get("conversions").unwrap_or(0),
@@ -67,7 +83,7 @@ pub async fn campaign_report(
     .unwrap_or((0, 0));
 
     let ctr_pct = if impressions > 0 { clicks as f64 / impressions as f64 * 100.0 } else { 0.0 };
-    let avg_cpm_cents = if impressions > 0 { spend_cents / impressions } else { 0 };
+    let avg_cpm_cents = if impressions > 0 { spend_cents * 1000 / impressions } else { 0 };
 
     // ── Daily breakdown (CTEs avoid the cross-join bug) ───────────────────────
     let daily_rows = sqlx::query(
@@ -75,8 +91,8 @@ pub async fn campaign_report(
         WITH
         imp AS (
             SELECT DATE_TRUNC('day', created_at) AS day,
-                   COUNT(*)                              AS impressions,
-                   COALESCE(SUM(clearing_price_cents),0) AS spend_cents
+                   COUNT(*)                                       AS impressions,
+                   COALESCE(SUM(clearing_price_cents),0)::BIGINT  AS spend_cents
             FROM impression_events
             WHERE campaign_id = $1 AND created_at >= $2 AND created_at < $3
             GROUP BY 1
@@ -89,8 +105,8 @@ pub async fn campaign_report(
         ),
         conv AS (
             SELECT DATE_TRUNC('day', created_at) AS day,
-                   COUNT(*)                              AS conversions,
-                   COALESCE(SUM(value_cents), 0)        AS conversion_value_cents
+                   COUNT(*)                                AS conversions,
+                   COALESCE(SUM(value_cents), 0)::BIGINT  AS conversion_value_cents
             FROM conversion_events
             WHERE campaign_id = $1 AND created_at >= $2 AND created_at < $3
             GROUP BY 1
@@ -108,7 +124,7 @@ pub async fn campaign_report(
         ORDER BY i.day
         "#,
     )
-    .bind(campaign_id).bind(q.from).bind(q.to)
+    .bind(campaign_id).bind(from).bind(to_exclusive)
     .fetch_all(&state.pg).await;
 
     let daily = match daily_rows {
@@ -125,8 +141,8 @@ pub async fn campaign_report(
 
     Json(CampaignReport {
         campaign_id,
-        from: q.from.to_rfc3339(),
-        to: q.to.to_rfc3339(),
+        from: q.from,
+        to: q.to,
         impressions,
         spend_cents,
         clicks,

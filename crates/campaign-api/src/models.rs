@@ -10,6 +10,7 @@ pub struct Advertiser {
     pub email: String,
     pub company_name: String,
     pub wallet_balance_cents: i64,
+    #[serde(skip)]
     pub password_hash: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
