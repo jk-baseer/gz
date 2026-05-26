@@ -1,0 +1,19 @@
+[package]
+name = "reporting"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "reporting"
+path = "src/main.rs"
+
+[dependencies]
+common = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

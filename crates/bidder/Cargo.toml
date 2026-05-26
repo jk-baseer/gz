@@ -1,0 +1,27 @@
+[package]
+name = "bidder"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bidder"
+path = "src/main.rs"
+
+[dependencies]
+openrtb = { workspace = true }
+common = { workspace = true }
+
+tokio = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+redis = { workspace = true }
+reqwest = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+dashmap = { workspace = true }

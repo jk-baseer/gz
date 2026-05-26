@@ -1,0 +1,18 @@
+[package]
+name = "event-consumer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "event-consumer"
+path = "src/main.rs"
+
+[dependencies]
+common = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
