@@ -26,14 +26,23 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState { pg });
 
     let app = Router::new()
+        // Advertisers
+        .route("/advertisers",           post(routes::advertisers::create))
+        .route("/advertisers/:id",       get(routes::advertisers::get_one))
+        .route("/advertisers/:id/topup", post(routes::advertisers::topup))
         // Campaigns
-        .route("/campaigns", get(routes::campaigns::list).post(routes::campaigns::create))
-        .route("/campaigns/:id", get(routes::campaigns::get_one).put(routes::campaigns::update))
-        .route("/campaigns/:id/pause", post(routes::campaigns::pause))
-        .route("/campaigns/:id/activate", post(routes::campaigns::activate))
+        .route("/campaigns",             get(routes::campaigns::list).post(routes::campaigns::create))
+        .route("/campaigns/:id",         get(routes::campaigns::get_one).put(routes::campaigns::update))
+        .route("/campaigns/:id/pause",   post(routes::campaigns::pause))
+        .route("/campaigns/:id/activate",post(routes::campaigns::activate))
+        // Targeting
+        .route("/campaigns/:id/targeting", get(routes::targeting::get).put(routes::targeting::update))
         // Creatives
         .route("/campaigns/:id/creatives", post(routes::creatives::create))
-        .route("/creatives/:id/approve", post(routes::creatives::approve))
+        .route("/creatives/:id/approve",   post(routes::creatives::approve))
+        .route("/creatives/:id/reject",    post(routes::creatives::reject))
+        // Reporting
+        .route("/campaigns/:id/report",    get(routes::reporting::campaign_report))
         // Health
         .route("/health", get(routes::health::handle))
         .layer(CorsLayer::permissive())

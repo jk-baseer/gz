@@ -2,6 +2,32 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+// ── Advertiser ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct Advertiser {
+    pub id: Uuid,
+    pub email: String,
+    pub company_name: String,
+    pub wallet_balance_cents: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateAdvertiserRequest {
+    pub email: String,
+    pub company_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TopUpRequest {
+    /// Amount to add in US cents (e.g. 10000 = $100.00)
+    pub amount_cents: i64,
+}
+
+// ── Campaign ──────────────────────────────────────────────────────────────────
+
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Campaign {
     pub id: Uuid,
@@ -24,7 +50,6 @@ pub struct CreateCampaignRequest {
     pub name: String,
     /// CPM bid price in US cents (e.g. 200 = $2.00 CPM)
     pub bid_price_cpm_cents: i64,
-    /// Total campaign budget in US cents
     pub budget_total_cents: i64,
     pub budget_daily_cents: Option<i64>,
     pub start_date: Option<DateTime<Utc>>,
@@ -40,6 +65,40 @@ pub struct UpdateCampaignRequest {
     pub start_date: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
 }
+
+// ── Targeting ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Targeting {
+    pub campaign_id: Uuid,
+    /// ISO-3166-1-alpha-3 codes: ["ARE","SAU","KWT","QAT","BHR","OMN"]
+    pub geo_countries: Vec<String>,
+    /// ["mobile","desktop","tablet"]
+    pub device_types: Vec<String>,
+    /// ["ios","android","windows","macos"]
+    pub os_types: Vec<String>,
+    /// IAB taxonomy codes: ["IAB13","IAB19"]
+    pub site_categories: Vec<String>,
+    /// BCP-47 codes: ["ar","en"]
+    pub languages: Vec<String>,
+    /// UTC hours 0–23 (empty = all hours)
+    pub hours_of_day: Vec<i32>,
+    /// 0=Sunday…6=Saturday (empty = all days)
+    pub days_of_week: Vec<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateTargetingRequest {
+    pub geo_countries: Option<Vec<String>>,
+    pub device_types: Option<Vec<String>>,
+    pub os_types: Option<Vec<String>>,
+    pub site_categories: Option<Vec<String>>,
+    pub languages: Option<Vec<String>>,
+    pub hours_of_day: Option<Vec<i32>>,
+    pub days_of_week: Option<Vec<i32>>,
+}
+
+// ── Creative ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Creative {
@@ -61,4 +120,27 @@ pub struct CreateCreativeRequest {
     pub height: Option<i32>,
     pub asset_url: String,
     pub click_url: String,
+}
+
+// ── Reporting ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct CampaignReport {
+    pub campaign_id: Uuid,
+    pub from: String,
+    pub to: String,
+    pub impressions: i64,
+    pub spend_cents: i64,
+    pub clicks: i64,
+    pub ctr_pct: f64,
+    pub avg_cpm_cents: i64,
+    pub daily: Vec<DailyStats>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DailyStats {
+    pub date: String,
+    pub impressions: i64,
+    pub spend_cents: i64,
+    pub clicks: i64,
 }

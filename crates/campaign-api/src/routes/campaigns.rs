@@ -50,7 +50,15 @@ pub async fn create(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateCampaignRequest>,
 ) -> impl IntoResponse {
-    let result = sqlx::query_as::<_, Campaign>(
+    let mut tx = match state.pg.begin().await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!(error = %e, "failed to begin transaction");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let campaign = sqlx::query_as::<_, Campaign>(
         r#"
         INSERT INTO campaigns (
             advertiser_id, name, bid_price_cpm_cents,
@@ -67,16 +75,35 @@ pub async fn create(
     .bind(body.budget_daily_cents)
     .bind(body.start_date)
     .bind(body.end_date)
-    .fetch_one(&state.pg)
+    .fetch_one(&mut *tx)
     .await;
 
-    match result {
-        Ok(c) => (StatusCode::CREATED, Json(c)).into_response(),
+    let campaign = match campaign {
+        Ok(c) => c,
         Err(e) => {
             tracing::error!(error = %e, "failed to create campaign");
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
+    };
+
+    // Auto-create an empty targeting record so the bidder can load it immediately
+    if let Err(e) = sqlx::query(
+        "INSERT INTO campaign_targeting (campaign_id) VALUES ($1)"
+    )
+    .bind(campaign.id)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!(error = %e, "failed to create targeting record");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!(error = %e, "transaction commit failed");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    (StatusCode::CREATED, Json(campaign)).into_response()
 }
 
 pub async fn update(

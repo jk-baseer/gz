@@ -89,7 +89,9 @@ CREATE TABLE impression_events (
     device_type         TEXT,
     os                  TEXT,
     site_domain         TEXT,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Set when the 1×1 pixel fires — confirms browser rendered the ad
+    viewed_at            TIMESTAMPTZ
 );
 
 CREATE INDEX imp_events_campaign_idx ON impression_events(campaign_id);

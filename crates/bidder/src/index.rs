@@ -5,8 +5,6 @@ use tokio::sync::RwLock;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::state::AppState;
-
 #[derive(Debug, Clone)]
 pub struct CampaignRecord {
     pub id: Uuid,
@@ -73,13 +71,13 @@ impl CampaignIndex {
     }
 }
 
-pub fn start_refresh_task(state: Arc<AppState>) {
+pub fn start_refresh_task(index: Arc<CampaignIndex>, pg: PgPool) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
         interval.tick().await; // skip first tick (already refreshed at startup)
         loop {
             interval.tick().await;
-            if let Err(e) = state.index.refresh(&state.pg).await {
+            if let Err(e) = index.refresh(&pg).await {
                 error!(error = %e, "campaign index refresh failed");
             }
         }

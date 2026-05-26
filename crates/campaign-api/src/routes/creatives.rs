@@ -39,6 +39,25 @@ pub async fn create(
     }
 }
 
+pub async fn reject(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let result = sqlx::query("UPDATE creatives SET status = 'rejected' WHERE id = $1")
+        .bind(id)
+        .execute(&state.pg)
+        .await;
+
+    match result {
+        Ok(r) if r.rows_affected() == 0 => StatusCode::NOT_FOUND.into_response(),
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to reject creative");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
 pub async fn approve(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,

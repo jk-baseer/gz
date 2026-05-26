@@ -71,7 +71,7 @@ pub fn matches(campaign: &CampaignRecord, req: &BidRequest, imp: &Imp) -> bool {
     // Device type
     if !campaign.targeting.device_types.is_empty() {
         if let Some(device) = &req.device {
-            let dt = device_type_str(device.devicetype);
+            let dt = device_type_str(device.devicetype.unwrap_or(0));
             if !campaign.targeting.device_types.contains(&dt) {
                 return false;
             }
@@ -160,13 +160,13 @@ pub fn matches(campaign: &CampaignRecord, req: &BidRequest, imp: &Imp) -> bool {
     true
 }
 
-fn device_type_str(dt: Option<u32>) -> String {
+pub fn device_type_str(dt: u32) -> String {
     match dt {
-        Some(4) | Some(1) => "mobile".to_string(),
-        Some(5) => "tablet".to_string(),
-        Some(2) => "desktop".to_string(),
-        Some(3) | Some(6) | Some(7) => "connected_tv".to_string(),
-        _ => "unknown".to_string(),
+        4 | 1 => "mobile".to_string(),
+        5     => "tablet".to_string(),
+        2     => "desktop".to_string(),
+        3 | 6 | 7 => "connected_tv".to_string(),
+        _     => "unknown".to_string(),
     }
 }
 

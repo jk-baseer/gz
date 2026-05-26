@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use redis::aio::ConnectionManager;
 use sqlx::PgPool;
 use common::Config;
@@ -7,7 +8,7 @@ use crate::index::CampaignIndex;
 pub struct AppState {
     pub pg: PgPool,
     pub redis: ConnectionManager,
-    pub index: CampaignIndex,
+    pub index: Arc<CampaignIndex>,
     pub cfg: Config,
 }
 
@@ -16,7 +17,7 @@ impl AppState {
         Self {
             pg,
             redis,
-            index: CampaignIndex::new(),
+            index: Arc::new(CampaignIndex::new()),
             cfg,
         }
     }

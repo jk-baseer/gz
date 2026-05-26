@@ -1,11 +1,15 @@
+use std::sync::Arc;
 use axum::{
-    extract::Path,
+    extract::{Path, State},
     http::{header, StatusCode},
     response::IntoResponse,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
-// 1x1 transparent GIF
+use bidder::token;
+use crate::state::AppState;
+
+// 1×1 transparent GIF
 const PIXEL: &[u8] = &[
     0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00,
     0x01, 0x00, 0x80, 0x00, 0x00, 0xff, 0xff, 0xff,
@@ -15,13 +19,50 @@ const PIXEL: &[u8] = &[
     0x01, 0x00, 0x3b,
 ];
 
-pub async fn handle(Path(token): Path<String>) -> impl IntoResponse {
-    debug!(token = %token, "impression tracked");
-    // TODO: decode token, publish impression event to Redpanda
+pub async fn handle(
+    State(state): State<Arc<AppState>>,
+    Path(token_str): Path<String>,
+) -> impl IntoResponse {
+    let tok = match token::decode(&token_str) {
+        Ok(t) => t,
+        Err(e) => {
+            warn!(error = %e, "invalid imp token");
+            return pixel_response();
+        }
+    };
+
+    debug!(
+        campaign_id = %tok.campaign_id,
+        exchange    = %tok.exchange,
+        "impression pixel fired"
+    );
+
+    // Mark the impression as rendered (browser confirmed it loaded)
+    let result = sqlx::query(
+        "UPDATE impression_events SET viewed_at = NOW()
+         WHERE auction_id = $1 AND campaign_id = $2
+         LIMIT 1",
+    )
+    .bind(&tok.auction_id)
+    .bind(tok.campaign_id)
+    .execute(&state.pg)
+    .await;
+
+    if let Err(e) = result {
+        warn!(error = %e, "failed to mark impression as viewed");
+    }
+
+    pixel_response()
+}
+
+fn pixel_response() -> impl IntoResponse {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "image/gif"),
-         (header::CACHE_CONTROL, "no-store, no-cache")],
+        [
+            (header::CONTENT_TYPE, "image/gif"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+            (header::PRAGMA, "no-cache"),
+        ],
         PIXEL,
     )
 }
