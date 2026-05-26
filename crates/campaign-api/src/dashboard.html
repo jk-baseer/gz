@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GZ Ads — Campaign Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+<style>
+  [x-cloak]{display:none!important}
+  .tab-active{border-bottom:2px solid #4f46e5;color:#4f46e5;font-weight:600}
+</style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800" x-data="app()" x-init="init()" x-cloak>
+
+<!-- Auth gate -->
+<div x-show="!token" class="min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-lg w-full max-w-sm p-8">
+    <h1 class="text-2xl font-bold text-indigo-600 mb-1">GZ Ads</h1>
+    <p class="text-sm text-gray-500 mb-6">Self-serve Campaign Manager</p>
+
+    <div class="flex mb-6 border-b">
+      <button @click="authTab='login'"
+        :class="authTab==='login'?'tab-active':''"
+        class="flex-1 py-2 text-sm text-gray-500">Login</button>
+      <button @click="authTab='register'"
+        :class="authTab==='register'?'tab-active':''"
+        class="flex-1 py-2 text-sm text-gray-500">Register</button>
+    </div>
+
+    <div x-show="authTab==='login'">
+      <input x-model="loginEmail" type="email" placeholder="Email"
+        class="w-full border rounded-lg px-3 py-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+      <input x-model="loginPassword" type="password" placeholder="Password"
+        class="w-full border rounded-lg px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+      <button @click="login()" class="w-full bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700">
+        Sign in
+      </button>
+    </div>
+
+    <div x-show="authTab==='register'">
+      <input x-model="regEmail" type="email" placeholder="Email"
+        class="w-full border rounded-lg px-3 py-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+      <input x-model="regCompany" type="text" placeholder="Company name"
+        class="w-full border rounded-lg px-3 py-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+      <input x-model="regPassword" type="password" placeholder="Password (min 8 chars)"
+        class="w-full border rounded-lg px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+      <button @click="register()" class="w-full bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700">
+        Create account
+      </button>
+    </div>
+
+    <p x-show="authError" x-text="authError" class="mt-3 text-xs text-red-500 text-center"></p>
+  </div>
+</div>
+
+<!-- Main app -->
+<div x-show="token" class="min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm">
+    <span class="font-bold text-indigo-600 text-lg">GZ Ads</span>
+    <div class="flex gap-6 text-sm">
+      <button @click="tab='campaigns'" :class="tab==='campaigns'?'tab-active':'text-gray-500'" class="pb-1">Campaigns</button>
+      <button @click="tab='exchanges';loadExchanges()" :class="tab==='exchanges'?'tab-active':'text-gray-500'" class="pb-1">Exchanges</button>
+      <button @click="tab='wallet'" :class="tab==='wallet'?'tab-active':'text-gray-500'" class="pb-1">Wallet</button>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-500" x-text="email"></span>
+      <button @click="logout()" class="text-xs text-red-500 hover:underline">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- Campaigns tab -->
+  <div x-show="tab==='campaigns'" class="max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-semibold">Campaigns</h2>
+      <button @click="showNewCampaign=!showNewCampaign"
+        class="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700">
+        + New Campaign
+      </button>
+    </div>
+
+    <!-- New campaign form -->
+    <div x-show="showNewCampaign" class="bg-white rounded-xl shadow p-6 mb-6">
+      <h3 class="font-semibold mb-4">Create Campaign</h3>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-gray-500">Campaign Name</label>
+          <input x-model="nc.name" type="text" class="w-full border rounded px-3 py-2 text-sm mt-1"/>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Bid Price (CPM cents, e.g. 200 = $2)</label>
+          <input x-model.number="nc.bid_price_cpm_cents" type="number" class="w-full border rounded px-3 py-2 text-sm mt-1"/>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Total Budget (cents)</label>
+          <input x-model.number="nc.budget_total_cents" type="number" class="w-full border rounded px-3 py-2 text-sm mt-1"/>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Daily Budget (cents, optional)</label>
+          <input x-model.number="nc.budget_daily_cents" type="number" class="w-full border rounded px-3 py-2 text-sm mt-1"/>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Freq Cap / user / day (optional)</label>
+          <input x-model.number="nc.frequency_cap_daily" type="number" class="w-full border rounded px-3 py-2 text-sm mt-1"/>
+        </div>
+      </div>
+      <div class="mt-4 flex gap-3">
+        <button @click="createCampaign()" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700">Save</button>
+        <button @click="showNewCampaign=false" class="text-gray-500 text-sm hover:underline">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Campaign list -->
+    <div class="space-y-3">
+      <template x-for="c in campaigns" :key="c.id">
+        <div class="bg-white rounded-xl shadow p-5 cursor-pointer hover:ring-2 hover:ring-indigo-300"
+          @click="selectCampaign(c)">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium" x-text="c.name"></p>
+              <p class="text-xs text-gray-400 mt-0.5"
+                x-text="`CPM $${(c.bid_price_cpm_cents/100).toFixed(2)} · Budget $${(c.budget_total_cents/100).toFixed(0)} · Spent $${(c.spend_total_cents/100).toFixed(2)}`"></p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full font-medium"
+              :class="c.status==='active'?'bg-green-100 text-green-700':c.status==='paused'?'bg-yellow-100 text-yellow-700':'bg-gray-100 text-gray-600'"
+              x-text="c.status"></span>
+          </div>
+        </div>
+      </template>
+      <p x-show="campaigns.length===0" class="text-center text-gray-400 py-12">No campaigns yet. Create one above.</p>
+    </div>
+
+    <!-- Campaign detail panel -->
+    <div x-show="selectedCampaign" class="fixed inset-0 bg-black/40 flex items-start justify-end z-40"
+      @click.self="selectedCampaign=null">
+      <div class="bg-white w-full max-w-lg h-full overflow-y-auto shadow-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-lg" x-text="selectedCampaign?.name"></h3>
+          <button @click="selectedCampaign=null" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+
+        <div class="flex gap-2 mb-6">
+          <button x-show="selectedCampaign?.status!=='active'" @click="setStatus('activate')"
+            class="bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">Activate</button>
+          <button x-show="selectedCampaign?.status==='active'" @click="setStatus('pause')"
+            class="bg-yellow-500 text-white text-xs px-3 py-1 rounded hover:bg-yellow-600">Pause</button>
+        </div>
+
+        <!-- Targeting -->
+        <div class="mb-6">
+          <h4 class="text-sm font-semibold mb-2 text-gray-700">Targeting</h4>
+          <div class="space-y-2">
+            <div>
+              <label class="text-xs text-gray-500">Geo Countries (comma-sep, ISO-3: ARE,SAU,KWT…)</label>
+              <input x-model="tgt.geo_countries_str" type="text" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Device Types (mobile,desktop,tablet)</label>
+              <input x-model="tgt.device_types_str" type="text" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">OS (ios,android,windows,macos)</label>
+              <input x-model="tgt.os_types_str" type="text" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Languages (ar,en)</label>
+              <input x-model="tgt.languages_str" type="text" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">IAB Categories (IAB13,IAB19)</label>
+              <input x-model="tgt.site_categories_str" type="text" class="w-full border rounded px-2 py-1.5 text-sm mt-1"/>
+            </div>
+          </div>
+          <button @click="saveTargeting()" class="mt-3 bg-indigo-600 text-white text-xs px-3 py-1.5 rounded hover:bg-indigo-700">
+            Save Targeting
+          </button>
+        </div>
+
+        <!-- Creatives -->
+        <div class="mb-6">
+          <h4 class="text-sm font-semibold mb-2 text-gray-700">Creatives</h4>
+          <div class="space-y-2 mb-3">
+            <template x-for="cr in creatives" :key="cr.id">
+              <div class="border rounded p-3 text-xs">
+                <div class="flex justify-between items-center">
+                  <span class="font-medium capitalize" x-text="cr.format"></span>
+                  <span class="px-2 py-0.5 rounded-full"
+                    :class="cr.status==='approved'?'bg-green-100 text-green-700':cr.status==='rejected'?'bg-red-100 text-red-600':'bg-yellow-100 text-yellow-700'"
+                    x-text="cr.status"></span>
+                </div>
+                <p class="text-gray-500 truncate mt-1" x-text="cr.asset_url"></p>
+              </div>
+            </template>
+          </div>
+
+          <!-- Add creative form -->
+          <div class="border rounded p-3 bg-gray-50">
+            <p class="text-xs font-semibold mb-2 text-gray-600">Add Creative</p>
+            <select x-model="nc2.format" class="w-full border rounded px-2 py-1.5 text-xs mb-2">
+              <option value="banner">Banner</option>
+              <option value="native">Native</option>
+              <option value="video">Video</option>
+            </select>
+            <input x-model="nc2.asset_url" type="text" placeholder="Asset URL (image/video)"
+              class="w-full border rounded px-2 py-1.5 text-xs mb-2"/>
+            <input x-model="nc2.click_url" type="text" placeholder="Click URL"
+              class="w-full border rounded px-2 py-1.5 text-xs mb-2"/>
+            <div x-show="nc2.format==='banner'" class="grid grid-cols-2 gap-2 mb-2">
+              <input x-model.number="nc2.width" type="number" placeholder="Width" class="border rounded px-2 py-1.5 text-xs"/>
+              <input x-model.number="nc2.height" type="number" placeholder="Height" class="border rounded px-2 py-1.5 text-xs"/>
+            </div>
+            <div x-show="nc2.format==='native'" class="space-y-2 mb-2">
+              <input x-model="nc2.title_text" type="text" placeholder="Title" class="w-full border rounded px-2 py-1.5 text-xs"/>
+              <input x-model="nc2.description" type="text" placeholder="Description" class="w-full border rounded px-2 py-1.5 text-xs"/>
+              <input x-model="nc2.cta_text" type="text" placeholder="CTA text (e.g. Learn More)" class="w-full border rounded px-2 py-1.5 text-xs"/>
+              <input x-model="nc2.sponsored_by" type="text" placeholder="Sponsored by" class="w-full border rounded px-2 py-1.5 text-xs"/>
+            </div>
+            <button @click="addCreative()" class="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded hover:bg-indigo-700">
+              Add Creative
+            </button>
+          </div>
+        </div>
+
+        <!-- Report -->
+        <div>
+          <h4 class="text-sm font-semibold mb-2 text-gray-700">Performance (last 7 days)</h4>
+          <template x-for="d in report" :key="d.date">
+            <div class="flex justify-between text-xs py-1.5 border-b last:border-0">
+              <span x-text="d.date"></span>
+              <span x-text="`${d.impressions} impr`" class="text-gray-500"></span>
+              <span x-text="`$${(d.spend_cents/100).toFixed(2)} spend`" class="text-gray-500"></span>
+              <span x-text="`${d.clicks} clicks`" class="text-gray-500"></span>
+            </div>
+          </template>
+          <p x-show="report.length===0" class="text-xs text-gray-400 py-4 text-center">No data yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exchanges tab -->
+  <div x-show="tab==='exchanges'" class="max-w-4xl mx-auto px-4 py-8">
+    <h2 class="text-xl font-semibold mb-6">Connected Exchanges</h2>
+    <div class="space-y-3">
+      <template x-for="ex in exchanges" :key="ex.id">
+        <div class="bg-white rounded-xl shadow p-5">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="font-medium" x-text="ex.name"></p>
+              <p class="text-xs text-gray-400 mt-0.5">
+                Slug: <span class="font-mono" x-text="ex.slug"></span>
+                · Floor: <span x-text="`$${(ex.min_floor_cents/100).toFixed(2)}`"></span> CPM
+              </p>
+              <p class="text-xs text-gray-400 mt-0.5" x-text="ex.notes"></p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded-full font-medium"
+              :class="ex.status==='active'?'bg-green-100 text-green-700':ex.status==='testing'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-600'"
+              x-text="ex.status"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Wallet tab -->
+  <div x-show="tab==='wallet'" class="max-w-lg mx-auto px-4 py-8">
+    <h2 class="text-xl font-semibold mb-2">Wallet</h2>
+    <p class="text-gray-500 text-sm mb-6">Add funds to run campaigns. Minimum top-up $10.</p>
+
+    <div class="bg-white rounded-xl shadow p-6">
+      <label class="text-xs text-gray-500 block mb-1">Amount (USD)</label>
+      <input x-model.number="topupAmount" type="number" min="10" step="10" value="50"
+        class="w-full border rounded px-3 py-2 text-sm mb-4"/>
+      <button @click="startCheckout()" class="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700">
+        Top Up via Stripe
+      </button>
+      <p x-show="walletError" x-text="walletError" class="mt-3 text-xs text-red-500"></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function app() {
+  return {
+    token: localStorage.getItem('gz_token') || '',
+    advertiserId: localStorage.getItem('gz_advertiser_id') || '',
+    email: localStorage.getItem('gz_email') || '',
+
+    authTab: 'login',
+    authError: '',
+
+    loginEmail: '', loginPassword: '',
+    regEmail: '', regCompany: '', regPassword: '',
+
+    tab: 'campaigns',
+    campaigns: [],
+    exchanges: [],
+    selectedCampaign: null,
+    creatives: [],
+    report: [],
+    showNewCampaign: false,
+
+    nc: { name:'', bid_price_cpm_cents:200, budget_total_cents:10000, budget_daily_cents:null, frequency_cap_daily:null },
+    nc2: { format:'banner', asset_url:'', click_url:'', width:null, height:null, title_text:'', description:'', cta_text:'', sponsored_by:'' },
+    tgt: { geo_countries_str:'', device_types_str:'', os_types_str:'', languages_str:'', site_categories_str:'' },
+    topupAmount: 50,
+    walletError: '',
+
+    async init() {
+      if (this.token) await this.loadCampaigns();
+    },
+
+    hdr() {
+      return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` };
+    },
+
+    async login() {
+      this.authError = '';
+      const r = await fetch('/auth/login', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email: this.loginEmail, password: this.loginPassword }) });
+      if (!r.ok) { const e = await r.json(); this.authError = e.error || 'Login failed'; return; }
+      const d = await r.json();
+      this.token = d.token;
+      this.advertiserId = d.advertiser_id;
+      this.email = d.email;
+      localStorage.setItem('gz_token', d.token);
+      localStorage.setItem('gz_advertiser_id', d.advertiser_id);
+      localStorage.setItem('gz_email', d.email);
+      await this.loadCampaigns();
+    },
+
+    async register() {
+      this.authError = '';
+      const r = await fetch('/auth/register', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email: this.regEmail, company_name: this.regCompany, password: this.regPassword }) });
+      if (!r.ok) { const e = await r.json(); this.authError = e.error || 'Registration failed'; return; }
+      const d = await r.json();
+      this.token = d.token;
+      this.advertiserId = d.advertiser_id;
+      this.email = d.email;
+      localStorage.setItem('gz_token', d.token);
+      localStorage.setItem('gz_advertiser_id', d.advertiser_id);
+      localStorage.setItem('gz_email', d.email);
+      await this.loadCampaigns();
+    },
+
+    async logout() {
+      await fetch('/auth/logout', { method:'POST' });
+      this.token = '';
+      localStorage.clear();
+    },
+
+    async loadCampaigns() {
+      const r = await fetch(`/campaigns?advertiser_id=${this.advertiserId}`, { headers: this.hdr() });
+      if (r.ok) this.campaigns = await r.json();
+    },
+
+    async createCampaign() {
+      const body = { ...this.nc, advertiser_id: this.advertiserId };
+      if (!body.budget_daily_cents) delete body.budget_daily_cents;
+      if (!body.frequency_cap_daily) delete body.frequency_cap_daily;
+      const r = await fetch('/campaigns', { method:'POST', headers: this.hdr(), body: JSON.stringify(body) });
+      if (r.ok) {
+        this.showNewCampaign = false;
+        this.nc = { name:'', bid_price_cpm_cents:200, budget_total_cents:10000, budget_daily_cents:null, frequency_cap_daily:null };
+        await this.loadCampaigns();
+      }
+    },
+
+    async selectCampaign(c) {
+      this.selectedCampaign = c;
+      this.nc2 = { format:'banner', asset_url:'', click_url:'', width:null, height:null, title_text:'', description:'', cta_text:'', sponsored_by:'' };
+      // Load targeting
+      const tr = await fetch(`/campaigns/${c.id}/targeting`, { headers: this.hdr() });
+      if (tr.ok) {
+        const t = await tr.json();
+        this.tgt = {
+          geo_countries_str: (t.geo_countries||[]).join(','),
+          device_types_str:  (t.device_types||[]).join(','),
+          os_types_str:      (t.os_types||[]).join(','),
+          languages_str:     (t.languages||[]).join(','),
+          site_categories_str: (t.site_categories||[]).join(','),
+        };
+      }
+      // Load creatives
+      const cr = await fetch(`/campaigns/${c.id}/creatives`, { headers: this.hdr() });
+      if (cr.ok) this.creatives = await cr.json();
+      // Load report
+      const today = new Date().toISOString().slice(0,10);
+      const week = new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+      const rr = await fetch(`/campaigns/${c.id}/report?from=${week}&to=${today}`, { headers: this.hdr() });
+      if (rr.ok) { const d = await rr.json(); this.report = d.daily || []; }
+    },
+
+    async setStatus(action) {
+      await fetch(`/campaigns/${this.selectedCampaign.id}/${action}`, { method:'POST', headers: this.hdr() });
+      await this.loadCampaigns();
+      this.selectedCampaign = this.campaigns.find(c => c.id === this.selectedCampaign.id) || null;
+    },
+
+    async saveTargeting() {
+      const body = {
+        geo_countries:   this.tgt.geo_countries_str.split(',').map(s=>s.trim()).filter(Boolean),
+        device_types:    this.tgt.device_types_str.split(',').map(s=>s.trim()).filter(Boolean),
+        os_types:        this.tgt.os_types_str.split(',').map(s=>s.trim()).filter(Boolean),
+        languages:       this.tgt.languages_str.split(',').map(s=>s.trim()).filter(Boolean),
+        site_categories: this.tgt.site_categories_str.split(',').map(s=>s.trim()).filter(Boolean),
+      };
+      await fetch(`/campaigns/${this.selectedCampaign.id}/targeting`, { method:'PUT', headers: this.hdr(), body: JSON.stringify(body) });
+    },
+
+    async addCreative() {
+      const body = { ...this.nc2 };
+      if (body.format !== 'banner') { delete body.width; delete body.height; }
+      if (body.format !== 'native') { delete body.title_text; delete body.description; delete body.cta_text; delete body.sponsored_by; }
+      await fetch(`/campaigns/${this.selectedCampaign.id}/creatives`, { method:'POST', headers: this.hdr(), body: JSON.stringify(body) });
+      const cr = await fetch(`/campaigns/${this.selectedCampaign.id}/creatives`, { headers: this.hdr() });
+      if (cr.ok) this.creatives = await cr.json();
+    },
+
+    async loadExchanges() {
+      const r = await fetch('/exchanges', { headers: this.hdr() });
+      if (r.ok) this.exchanges = await r.json();
+    },
+
+    async startCheckout() {
+      this.walletError = '';
+      const amount_cents = Math.round(this.topupAmount * 100);
+      const origin = window.location.origin;
+      const r = await fetch('/billing/checkout', {
+        method: 'POST',
+        headers: this.hdr(),
+        body: JSON.stringify({ amount_cents, success_url: `${origin}/?topup=ok`, cancel_url: `${origin}/?topup=cancel` })
+      });
+      if (!r.ok) { const e = await r.json(); this.walletError = e.error || 'Checkout failed'; return; }
+      const d = await r.json();
+      window.location.href = d.url;
+    },
+  };
+}
+</script>
+</body>
+</html>

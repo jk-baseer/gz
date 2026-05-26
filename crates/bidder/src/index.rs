@@ -15,6 +15,8 @@ pub struct CampaignRecord {
     pub budget_total_cents: i64,
     pub start_date: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
+    /// Max impressions per user per day (None = uncapped)
+    pub frequency_cap_daily: Option<i32>,
     pub targeting: TargetingRecord,
     pub creatives: Vec<CreativeRecord>,
 }
@@ -45,6 +47,10 @@ pub struct CreativeRecord {
     pub height: Option<i32>,
     pub asset_url: String,
     pub click_url: String,
+    pub title_text: Option<String>,
+    pub description: Option<String>,
+    pub cta_text: Option<String>,
+    pub sponsored_by: Option<String>,
 }
 
 pub struct CampaignIndex {
@@ -96,6 +102,7 @@ async fn load_active_campaigns(pg: &PgPool) -> anyhow::Result<Vec<CampaignRecord
             c.budget_total_cents,
             c.start_date,
             c.end_date,
+            c.frequency_cap_daily,
             COALESCE(t.geo_countries,   '{}') AS geo_countries,
             COALESCE(t.device_types,    '{}') AS device_types,
             COALESCE(t.os_types,        '{}') AS os_types,
@@ -125,6 +132,7 @@ async fn load_active_campaigns(pg: &PgPool) -> anyhow::Result<Vec<CampaignRecord
             budget_total_cents: row.try_get("budget_total_cents")?,
             start_date: row.try_get("start_date")?,
             end_date: row.try_get("end_date")?,
+            frequency_cap_daily: row.try_get("frequency_cap_daily")?,
             targeting: TargetingRecord {
                 geo_countries: row.try_get("geo_countries")?,
                 device_types: row.try_get("device_types")?,
@@ -144,7 +152,8 @@ async fn load_active_campaigns(pg: &PgPool) -> anyhow::Result<Vec<CampaignRecord
 async fn load_creatives(pg: &PgPool, campaign_id: Uuid) -> anyhow::Result<Vec<CreativeRecord>> {
     let rows = sqlx::query(
         r#"
-        SELECT id, format, width, height, asset_url, click_url
+        SELECT id, format, width, height, asset_url, click_url,
+               title_text, description, cta_text, sponsored_by
         FROM creatives
         WHERE campaign_id = $1 AND status = 'approved'
         "#,
@@ -162,6 +171,10 @@ async fn load_creatives(pg: &PgPool, campaign_id: Uuid) -> anyhow::Result<Vec<Cr
                 height: r.try_get("height")?,
                 asset_url: r.try_get("asset_url")?,
                 click_url: r.try_get("click_url")?,
+                title_text: r.try_get("title_text")?,
+                description: r.try_get("description")?,
+                cta_text: r.try_get("cta_text")?,
+                sponsored_by: r.try_get("sponsored_by")?,
             })
         })
         .collect()

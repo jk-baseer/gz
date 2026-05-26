@@ -1,6 +1,9 @@
 pub mod advertisers;
+pub mod auth;
+pub mod billing;
 pub mod campaigns;
 pub mod creatives;
+pub mod exchanges;
 pub mod health;
 pub mod reporting;
 pub mod targeting;

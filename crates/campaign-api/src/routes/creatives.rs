@@ -16,8 +16,10 @@ pub async fn create(
 ) -> impl IntoResponse {
     let result = sqlx::query_as::<_, Creative>(
         r#"
-        INSERT INTO creatives (campaign_id, format, width, height, asset_url, click_url)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO creatives
+            (campaign_id, format, width, height, asset_url, click_url,
+             title_text, description, cta_text, sponsored_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
         "#,
     )
@@ -27,6 +29,10 @@ pub async fn create(
     .bind(body.height)
     .bind(&body.asset_url)
     .bind(&body.click_url)
+    .bind(&body.title_text)
+    .bind(&body.description)
+    .bind(&body.cta_text)
+    .bind(&body.sponsored_by)
     .fetch_one(&state.pg)
     .await;
 
@@ -34,6 +40,26 @@ pub async fn create(
         Ok(c) => (StatusCode::CREATED, Json(c)).into_response(),
         Err(e) => {
             tracing::error!(error = %e, "failed to create creative");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Path(campaign_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let result = sqlx::query_as::<_, Creative>(
+        "SELECT * FROM creatives WHERE campaign_id = $1 ORDER BY created_at DESC",
+    )
+    .bind(campaign_id)
+    .fetch_all(&state.pg)
+    .await;
+
+    match result {
+        Ok(rows) => Json(rows).into_response(),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to list creatives");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }

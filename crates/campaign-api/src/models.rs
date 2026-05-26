@@ -10,6 +10,7 @@ pub struct Advertiser {
     pub email: String,
     pub company_name: String,
     pub wallet_balance_cents: i64,
+    pub password_hash: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -38,6 +39,7 @@ pub struct Campaign {
     pub budget_total_cents: i64,
     pub budget_daily_cents: Option<i64>,
     pub spend_total_cents: i64,
+    pub frequency_cap_daily: Option<i32>,
     pub start_date: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -52,6 +54,7 @@ pub struct CreateCampaignRequest {
     pub bid_price_cpm_cents: i64,
     pub budget_total_cents: i64,
     pub budget_daily_cents: Option<i64>,
+    pub frequency_cap_daily: Option<i32>,
     pub start_date: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
 }
@@ -62,6 +65,7 @@ pub struct UpdateCampaignRequest {
     pub bid_price_cpm_cents: Option<i64>,
     pub budget_total_cents: Option<i64>,
     pub budget_daily_cents: Option<i64>,
+    pub frequency_cap_daily: Option<i32>,
     pub start_date: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
 }
@@ -107,19 +111,68 @@ pub struct Creative {
     pub format: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
+    /// Main image / video URL
     pub asset_url: String,
     pub click_url: String,
     pub status: String,
+    // Native-only fields
+    pub title_text: Option<String>,
+    pub description: Option<String>,
+    pub cta_text: Option<String>,
+    pub sponsored_by: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateCreativeRequest {
+    /// "banner" | "native" | "video"
     pub format: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
     pub asset_url: String,
     pub click_url: String,
+    // Native-only
+    pub title_text: Option<String>,
+    pub description: Option<String>,
+    pub cta_text: Option<String>,
+    pub sponsored_by: Option<String>,
+}
+
+// ── Exchange config ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct ExchangeConfig {
+    pub id: Uuid,
+    pub slug: String,
+    pub name: String,
+    pub status: String,
+    pub endpoint_url: Option<String>,
+    pub win_price_macro: String,
+    pub min_floor_cents: i32,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateExchangeRequest {
+    pub slug: String,
+    pub name: String,
+    pub status: Option<String>,
+    pub endpoint_url: Option<String>,
+    pub win_price_macro: Option<String>,
+    pub min_floor_cents: Option<i32>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateExchangeRequest {
+    pub name: Option<String>,
+    pub status: Option<String>,
+    pub endpoint_url: Option<String>,
+    pub win_price_macro: Option<String>,
+    pub min_floor_cents: Option<i32>,
+    pub notes: Option<String>,
 }
 
 // ── Reporting ─────────────────────────────────────────────────────────────────

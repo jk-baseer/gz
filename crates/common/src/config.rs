@@ -11,6 +11,9 @@ pub struct Config {
     /// Public hostname for win notice URLs (e.g. "bidder.gz-ads.com")
     pub public_hostname: String,
     pub log_level: String,
+    pub jwt_secret: String,
+    pub stripe_secret_key: String,
+    pub stripe_webhook_secret: String,
 }
 
 impl Config {
@@ -24,6 +27,9 @@ impl Config {
             .set_default("api_port", 8081u16)?
             .set_default("public_hostname", "localhost:8080")?
             .set_default("log_level", "info")?
+            .set_default("jwt_secret", "change-me-in-production")?
+            .set_default("stripe_secret_key", "")?
+            .set_default("stripe_webhook_secret", "")?
             .add_source(config::Environment::default())
             .build()?;
 

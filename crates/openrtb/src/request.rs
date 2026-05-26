@@ -108,11 +108,65 @@ pub struct Video {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Native {
+    /// JSON-encoded NativeRequest (OpenRTB Native 1.2)
     pub request: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ver: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ext: Option<serde_json::Value>,
+}
+
+/// Parsed native ad request (subset of OpenRTB Native 1.2 used for matching)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NativeRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ver: Option<String>,
+    pub assets: Vec<NativeAsset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ext: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NativeAsset {
+    pub id: u32,
+    #[serde(default)]
+    pub required: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<NativeTitle>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub img: Option<NativeImage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<NativeData>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NativeTitle {
+    pub len: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NativeImage {
+    /// 1=Icon, 3=Main image
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub type_: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub w: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub h: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wmin: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hmin: Option<u32>,
+    pub mimes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NativeData {
+    /// 1=Sponsored, 2=Desc, 11=CTA text, 12=Rating, 500+=custom
+    #[serde(rename = "type")]
+    pub type_: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub len: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

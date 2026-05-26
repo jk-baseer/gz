@@ -135,14 +135,13 @@ pub fn matches(campaign: &CampaignRecord, req: &BidRequest, imp: &Imp) -> bool {
         // If no categories in request, don't block — some publishers don't send them
     }
 
-    // Creative size — must have at least one approved creative matching the imp
+    // Must have a matching approved creative for this impression type
     if let Some(banner) = &imp.banner {
         let has_size = campaign.creatives.iter().filter(|c| c.format == "banner").any(|c| {
             let (cw, ch) = match (c.width, c.height) {
                 (Some(w), Some(h)) => (w as u32, h as u32),
-                _ => return true, // no size constraint on creative
+                _ => return true,
             };
-
             if let Some(formats) = &banner.format {
                 formats.iter().any(|f| f.w == cw && f.h == ch)
             } else {
@@ -151,10 +150,20 @@ pub fn matches(campaign: &CampaignRecord, req: &BidRequest, imp: &Imp) -> bool {
                 bw_ok && bh_ok
             }
         });
-
         if !has_size {
             return false;
         }
+    } else if imp.native.is_some() {
+        if !campaign.creatives.iter().any(|c| c.format == "native") {
+            return false;
+        }
+    } else if imp.video.is_some() {
+        if !campaign.creatives.iter().any(|c| c.format == "video") {
+            return false;
+        }
+    } else {
+        // Unknown impression type — skip
+        return false;
     }
 
     true
@@ -195,6 +204,11 @@ pub fn pick_creative<'a>(
                     false
                 }
             })
+    } else if imp.native.is_some() {
+        // Pick the first approved native creative
+        campaign.creatives.iter().find(|c| c.format == "native")
+    } else if imp.video.is_some() {
+        campaign.creatives.iter().find(|c| c.format == "video")
     } else {
         None
     }

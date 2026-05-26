@@ -10,7 +10,7 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use openrtb::{BidRequest, BidResponse, Bid, SeatBid};
-use bidder::{budget, targeting, targeting::device_type_str, token};
+use bidder::{budget, frequency, targeting, targeting::device_type_str, token};
 use crate::state::AppState;
 
 pub async fn handle(
@@ -57,6 +57,21 @@ pub async fn handle(
             debug!(imp_id = %imp.id, "no matching campaign");
             continue;
         };
+
+        // Frequency cap — limit impressions per user per day
+        let user_id = req.device.as_ref()
+            .and_then(|d| d.ifa.as_deref())
+            .unwrap_or("");
+
+        if let Some(cap) = campaign.frequency_cap_daily {
+            let allowed = frequency::check_and_record(&mut redis, campaign.id, user_id, cap)
+                .await
+                .unwrap_or(true); // on Redis error, allow the bid
+            if !allowed {
+                debug!(campaign_id = %campaign.id, "frequency cap reached");
+                continue;
+            }
+        }
 
         let approved = match budget::try_reserve(
             &mut redis,
@@ -120,13 +135,23 @@ pub async fn handle(
             ex     = exchange,
         );
 
-        let ad_markup = banner_markup(
-            &creative.asset_url,
-            &tok,
-            &state.cfg.public_hostname,
-            creative.width,
-            creative.height,
-        );
+        let ad_markup = if imp.banner.is_some() {
+            banner_markup(
+                &creative.asset_url,
+                &tok,
+                &state.cfg.public_hostname,
+                creative.width,
+                creative.height,
+            )
+        } else if imp.native.is_some() {
+            native_markup(creative, &tok, &state.cfg.public_hostname)
+        } else {
+            // video: return asset URL directly as VAST URL
+            format!(
+                "https://{}/vast/{}",
+                state.cfg.public_hostname, tok
+            )
+        };
 
         bids.push(Bid {
             id: bid_id,
@@ -164,6 +189,64 @@ pub async fn handle(
     };
 
     Json(response).into_response()
+}
+
+fn native_markup(
+    creative: &bidder::index::CreativeRecord,
+    token: &str,
+    hostname: &str,
+) -> String {
+    let click_url = format!("https://{hostname}/click/{token}");
+    let imp_url = format!("https://{hostname}/imp/{token}");
+
+    let title = creative.title_text.as_deref().unwrap_or("");
+    let desc = creative.description.as_deref().unwrap_or("");
+    let cta = creative.cta_text.as_deref().unwrap_or("Learn More");
+    let sponsored = creative.sponsored_by.as_deref().unwrap_or("");
+
+    // Build native response assets array
+    let mut assets = vec![];
+    if !title.is_empty() {
+        assets.push(serde_json::json!({
+            "id": 1,
+            "required": 1,
+            "title": { "text": title }
+        }));
+    }
+    if !creative.asset_url.is_empty() {
+        assets.push(serde_json::json!({
+            "id": 2,
+            "required": 1,
+            "img": { "type": 3, "url": creative.asset_url, "w": creative.width, "h": creative.height }
+        }));
+    }
+    if !desc.is_empty() {
+        assets.push(serde_json::json!({
+            "id": 3,
+            "data": { "type": 2, "value": desc }
+        }));
+    }
+    if !cta.is_empty() {
+        assets.push(serde_json::json!({
+            "id": 4,
+            "data": { "type": 12, "value": cta }
+        }));
+    }
+    if !sponsored.is_empty() {
+        assets.push(serde_json::json!({
+            "id": 5,
+            "data": { "type": 1, "value": sponsored }
+        }));
+    }
+
+    let native = serde_json::json!({
+        "ver": "1.2",
+        "link": { "url": click_url },
+        "imptrackers": [imp_url],
+        "assets": assets
+    });
+
+    native.to_string()
 }
 
 fn banner_markup(

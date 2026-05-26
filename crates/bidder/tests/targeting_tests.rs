@@ -12,6 +12,7 @@ fn campaign(targeting: TargetingRecord) -> CampaignRecord {
         bid_price_cpm_cents: 200,
         budget_daily_cents: Some(10_000_00),
         budget_total_cents: 100_000_00,
+        frequency_cap_daily: None,
         start_date: None,
         end_date: None,
         targeting,
@@ -22,6 +23,10 @@ fn campaign(targeting: TargetingRecord) -> CampaignRecord {
             height: Some(250),
             asset_url: "https://cdn.test/ad.jpg".into(),
             click_url: "https://advertiser.test/landing".into(),
+            title_text: None,
+            description: None,
+            cta_text: None,
+            sponsored_by: None,
         }],
     }
 }
@@ -240,7 +245,7 @@ fn future_campaign_fails() {
 
 #[test]
 fn creative_size_mismatch_fails() {
-    let mut c = campaign(TargetingRecord::default());
+    let c = campaign(TargetingRecord::default());
     // Creative is 300x250, impression wants 728x90
     let mut i = imp();
     if let Some(b) = i.banner.as_mut() {
