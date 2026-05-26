@@ -1,4 +1,5 @@
 pub mod advertisers;
+pub mod ai_suggest;
 pub mod auth;
 pub mod billing;
 pub mod campaigns;

@@ -67,18 +67,69 @@
     </div>
 
     <!-- New campaign form -->
-    <div x-show="showNewCampaign" class="card mb-6">
-      <h3 class="font-semibold mb-4">Create Campaign</h3>
+    <div x-show="showNewCampaign" class="card mb-6 space-y-5">
+      <h3 class="font-semibold">Create Campaign</h3>
+
+      <!-- AI Campaign Assistant -->
+      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-indigo-600 font-semibold text-xs uppercase tracking-wide">Campaign Assistant</span>
+          <span class="text-xs text-gray-400">Describe your goal — AI will configure targeting</span>
+        </div>
+        <textarea
+          x-model="aiPrompt"
+          rows="3"
+          placeholder='e.g. "I sell fleet management software to logistics companies in the UAE and Saudi Arabia. My target is B2B decision-makers." or "I want to reach fitness enthusiasts aged 18–35 across GCC."'
+          class="input w-full resize-none text-sm"
+        ></textarea>
+        <div class="flex items-center gap-3 mt-2">
+          <button
+            @click="runAiSuggest()"
+            :disabled="aiLoading||!aiPrompt.trim()"
+            class="btn-sm btn-indigo disabled:opacity-50"
+          >
+            <span x-show="!aiLoading">✦ Generate targeting</span>
+            <span x-show="aiLoading">Thinking…</span>
+          </button>
+          <p x-show="aiError" x-text="aiError" class="text-xs text-red-500"></p>
+        </div>
+
+        <!-- AI result card -->
+        <div x-show="aiSuggestion" class="mt-3 bg-white border border-indigo-100 rounded-lg p-3 text-xs space-y-1">
+          <p class="font-medium text-indigo-700">Suggestion applied ✓</p>
+          <p class="text-gray-600 italic" x-text="aiSuggestion?.reasoning"></p>
+          <div class="flex flex-wrap gap-1 mt-1">
+            <template x-for="g in (aiSuggestion?.geo_countries||[])" :key="g">
+              <span class="bg-blue-100 text-blue-700 rounded px-1.5 py-0.5" x-text="g"></span>
+            </template>
+            <template x-for="d in (aiSuggestion?.device_types||[])" :key="d">
+              <span class="bg-purple-100 text-purple-700 rounded px-1.5 py-0.5" x-text="d"></span>
+            </template>
+            <template x-for="c in (aiSuggestion?.site_categories||[])" :key="c">
+              <span class="bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5" x-text="c"></span>
+            </template>
+            <template x-for="kw in (aiSuggestion?.keywords||[])" :key="kw">
+              <span class="bg-indigo-100 text-indigo-700 rounded px-1.5 py-0.5" x-text="kw"></span>
+            </template>
+            <template x-if="aiSuggestion?.age_min||aiSuggestion?.age_max">
+              <span class="bg-green-100 text-green-700 rounded px-1.5 py-0.5"
+                x-text="'Age '+(aiSuggestion.age_min||'?')+'-'+(aiSuggestion.age_max||'?')"></span>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual fields (pre-filled by AI or edited by advertiser) -->
       <div class="grid grid-cols-2 gap-3">
-        <div><label class="label">Name</label><input x-model="nc.name" type="text" class="input mt-1"/></div>
-        <div><label class="label">CPM bid (cents, e.g. 200 = $2.00)</label><input x-model.number="nc.bid_price_cpm_cents" type="number" class="input mt-1"/></div>
-        <div><label class="label">Total budget (cents)</label><input x-model.number="nc.budget_total_cents" type="number" class="input mt-1"/></div>
+        <div class="col-span-2"><label class="label">Campaign Name</label><input x-model="nc.name" type="text" class="input mt-1"/></div>
+        <div><label class="label">CPM bid (cents — $2.00 = 200)</label><input x-model.number="nc.bid_price_cpm_cents" type="number" class="input mt-1"/></div>
+        <div><label class="label">Total budget (cents — $100 = 10000)</label><input x-model.number="nc.budget_total_cents" type="number" class="input mt-1"/></div>
         <div><label class="label">Daily budget (cents, optional)</label><input x-model.number="nc.budget_daily_cents" type="number" class="input mt-1"/></div>
         <div><label class="label">Freq cap / user / day (optional)</label><input x-model.number="nc.frequency_cap_daily" type="number" class="input mt-1"/></div>
       </div>
-      <div class="mt-4 flex gap-2">
-        <button @click="createCampaign()" class="btn-primary">Save</button>
-        <button @click="showNewCampaign=false" class="text-gray-400 hover:underline text-xs">Cancel</button>
+      <div class="flex gap-2">
+        <button @click="createCampaign()" class="btn-primary">Save &amp; apply targeting</button>
+        <button @click="showNewCampaign=false;aiSuggestion=null;aiPrompt=''" class="text-gray-400 hover:underline text-xs">Cancel</button>
       </div>
     </div>
 
@@ -372,6 +423,8 @@ function app() {
     creatives: [], report: [], reportTotals: { impressions:0, spend_cents:0, clicks:0, conversions:0 },
     showNewCampaign: false,
 
+    aiPrompt: '', aiLoading: false, aiError: '', aiSuggestion: null,
+
     nc:  { name:'', bid_price_cpm_cents:200, budget_total_cents:10000, budget_daily_cents:null, frequency_cap_daily:null },
     nc2: { format:'banner', asset_url:'', click_url:'', width:null, height:null, title_text:'', description:'', cta_text:'', sponsored_by:'' },
     tgt: {
@@ -452,13 +505,58 @@ function app() {
       if (r.ok) this.campaigns = await r.json();
     },
 
+    async runAiSuggest() {
+      this.aiLoading=true; this.aiError=''; this.aiSuggestion=null;
+      try {
+        const r = await fetch('/campaigns/ai-suggest', {
+          method:'POST', headers:this.hdr(),
+          body: JSON.stringify({ prompt: this.aiPrompt }),
+        });
+        if (!r.ok) { const e=await r.json(); this.aiError=e.error||'AI request failed'; return; }
+        const s = await r.json();
+        this.aiSuggestion = s;
+        // Pre-fill campaign form
+        if (s.suggested_name)          this.nc.name = s.suggested_name;
+        if (s.suggested_bid_cpm_cents) this.nc.bid_price_cpm_cents = s.suggested_bid_cpm_cents;
+        // Pre-fill targeting state (shown after campaign is selected)
+        this.tgt.geo_countries_str = (s.geo_countries||[]).join(',');
+        this.tgt.device_types_str  = (s.device_types||[]).join(',');
+        this.tgt.os_types_str      = (s.os_types||[]).join(',');
+        this.tgt.languages_str     = (s.languages||[]).join(',');
+        this.tgt.site_categories   = s.site_categories||[];
+        this.tgt.domain_allowlist  = s.domain_allowlist||[];
+        this.tgt.keywords          = s.keywords||[];
+        this.tgt.age_min           = s.age_min||null;
+        this.tgt.age_max           = s.age_max||null;
+      } catch(e) { this.aiError='Network error'; }
+      finally    { this.aiLoading=false; }
+    },
+
     async createCampaign() {
       const body = { ...this.nc, advertiser_id:this.advertiserId };
       if (!body.budget_daily_cents) delete body.budget_daily_cents;
       if (!body.frequency_cap_daily) delete body.frequency_cap_daily;
       const r = await fetch('/campaigns', { method:'POST', headers:this.hdr(), body:JSON.stringify(body) });
       if (r.ok) {
+        const created = await r.json();
+        // Apply AI-suggested targeting immediately if available
+        if (this.aiSuggestion) {
+          const tgtBody = {
+            geo_countries:    this.tgt.geo_countries_str.split(',').map(s=>s.trim()).filter(Boolean),
+            device_types:     this.tgt.device_types_str.split(',').map(s=>s.trim()).filter(Boolean),
+            os_types:         this.tgt.os_types_str.split(',').map(s=>s.trim()).filter(Boolean),
+            languages:        this.tgt.languages_str.split(',').map(s=>s.trim()).filter(Boolean),
+            site_categories:  this.tgt.site_categories,
+            domain_allowlist: this.tgt.domain_allowlist,
+            domain_blocklist: this.tgt.domain_blocklist,
+            keywords:         this.tgt.keywords,
+            age_min:          this.tgt.age_min||null,
+            age_max:          this.tgt.age_max||null,
+          };
+          await fetch(`/campaigns/${created.id}/targeting`, { method:'PUT', headers:this.hdr(), body:JSON.stringify(tgtBody) });
+        }
         this.showNewCampaign=false;
+        this.aiSuggestion=null; this.aiPrompt='';
         this.nc={ name:'', bid_price_cpm_cents:200, budget_total_cents:10000, budget_daily_cents:null, frequency_cap_daily:null };
         await this.loadCampaigns();
       }

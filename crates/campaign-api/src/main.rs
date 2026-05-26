@@ -32,7 +32,11 @@ async fn main() -> anyhow::Result<()> {
 
     sqlx::migrate!("../../migrations").run(&pg).await?;
 
-    let state = Arc::new(AppState { pg, cfg });
+    let http = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
+    let state = Arc::new(AppState { pg, cfg, http });
 
     let app = Router::new()
         // Dashboard UI
@@ -80,6 +84,8 @@ async fn main() -> anyhow::Result<()> {
             get(routes::exchanges::get_one).put(routes::exchanges::update),
         )
         .route("/exchanges/stats", get(routes::exchanges::stats))
+        // AI campaign assistant
+        .route("/campaigns/ai-suggest", post(routes::ai_suggest::suggest))
         // Billing (Stripe)
         .route("/billing/checkout", post(routes::billing::checkout))
         .route("/billing/webhook", post(routes::billing::webhook))

@@ -16,6 +16,7 @@ pub struct Config {
     pub stripe_webhook_secret: String,
     pub clickhouse_url: String,
     pub clickhouse_db: String,
+    pub anthropic_api_key: String,
 }
 
 impl Config {
@@ -34,6 +35,7 @@ impl Config {
             .set_default("stripe_webhook_secret", "")?
             .set_default("clickhouse_url", "http://localhost:8123")?
             .set_default("clickhouse_db", "gz")?
+            .set_default("anthropic_api_key", "")?
             .add_source(config::Environment::default())
             .build()?;
 
