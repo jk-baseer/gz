@@ -14,6 +14,8 @@ pub struct Config {
     pub jwt_secret: String,
     pub stripe_secret_key: String,
     pub stripe_webhook_secret: String,
+    pub clickhouse_url: String,
+    pub clickhouse_db: String,
 }
 
 impl Config {
@@ -30,6 +32,8 @@ impl Config {
             .set_default("jwt_secret", "change-me-in-production")?
             .set_default("stripe_secret_key", "")?
             .set_default("stripe_webhook_secret", "")?
+            .set_default("clickhouse_url", "http://localhost:8123")?
+            .set_default("clickhouse_db", "gz")?
             .add_source(config::Environment::default())
             .build()?;
 

@@ -58,6 +58,16 @@ pub async fn handle(
             continue;
         };
 
+        // Pacing — skip if this campaign's per-minute budget is exhausted
+        {
+            let pace_key = format!("pace_cap:{}", campaign.id);
+            let cap: Option<i64> = redis.get(&pace_key).await.unwrap_or(None);
+            if cap == Some(0) {
+                debug!(campaign_id = %campaign.id, "campaign paced out this minute");
+                continue;
+            }
+        }
+
         // Frequency cap — limit impressions per user per day
         let user_id = req.device.as_ref()
             .and_then(|d| d.ifa.as_deref())
@@ -146,11 +156,8 @@ pub async fn handle(
         } else if imp.native.is_some() {
             native_markup(creative, &tok, &state.cfg.public_hostname)
         } else {
-            // video: return asset URL directly as VAST URL
-            format!(
-                "https://{}/vast/{}",
-                state.cfg.public_hostname, tok
-            )
+            // video: return a VAST URL; the exchange fetches it to get the XML
+            format!("https://{}/vast/{tok}", state.cfg.public_hostname)
         };
 
         bids.push(Bid {

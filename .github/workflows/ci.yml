@@ -41,6 +41,9 @@ jobs:
       DATABASE_URL: postgres://gz:gz@localhost:5432/gz_ads
       REDIS_URL: redis://localhost:6379
       PUBLIC_HOSTNAME: localhost:8080
+      JWT_SECRET: ci-test-secret
+      CLICKHOUSE_URL: http://localhost:8123
+      CLICKHOUSE_DB: gz
 
     steps:
       - uses: actions/checkout@v4

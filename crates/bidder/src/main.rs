@@ -30,11 +30,13 @@ async fn main() -> anyhow::Result<()> {
     index::start_refresh_task(Arc::clone(&state.index), pg);
 
     let app = Router::new()
-        .route("/bid/:exchange", post(routes::bid::handle))
-        .route("/win",           get(routes::win::handle))
-        .route("/imp/:token",    get(routes::imp::handle))
-        .route("/click/:token",  get(routes::click::handle))
-        .route("/health",        get(routes::health::handle))
+        .route("/bid/:exchange",    post(routes::bid::handle))
+        .route("/win",              get(routes::win::handle))
+        .route("/imp/:token",       get(routes::imp::handle))
+        .route("/click/:token",     get(routes::click::handle))
+        .route("/vast/:token",      get(routes::vast::handle))
+        .route("/conv/:campaign_id",get(routes::conv::handle))
+        .route("/health",           get(routes::health::handle))
         .layer(TraceLayer::new_for_http())
         .with_state(Arc::clone(&state));
 

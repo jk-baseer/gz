@@ -9,7 +9,6 @@ use tracing::{debug, warn};
 use bidder::token;
 use crate::state::AppState;
 
-// 1×1 transparent GIF
 const PIXEL: &[u8] = &[
     0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00,
     0x01, 0x00, 0x80, 0x00, 0x00, 0xff, 0xff, 0xff,
@@ -37,11 +36,17 @@ pub async fn handle(
         "impression pixel fired"
     );
 
-    // Mark the impression as rendered (browser confirmed it loaded)
+    // PostgreSQL UPDATE — use subquery to avoid unsupported LIMIT in UPDATE
     let result = sqlx::query(
-        "UPDATE impression_events SET viewed_at = NOW()
-         WHERE auction_id = $1 AND campaign_id = $2
-         LIMIT 1",
+        r#"
+        UPDATE impression_events SET viewed_at = NOW()
+        WHERE id = (
+            SELECT id FROM impression_events
+            WHERE auction_id = $1 AND campaign_id = $2 AND viewed_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+        )
+        "#,
     )
     .bind(&tok.auction_id)
     .bind(tok.campaign_id)
