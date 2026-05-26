@@ -33,10 +33,20 @@ pub struct TargetingRecord {
     pub site_categories: Vec<String>,
     /// BCP-47 language codes (e.g. "ar", "en")
     pub languages: Vec<String>,
-    /// 0–23
+    /// 0–23 UTC hours (empty = all)
     pub hours_of_day: Vec<i32>,
-    /// 0=Sunday … 6=Saturday
+    /// 0=Sunday … 6=Saturday (empty = all)
     pub days_of_week: Vec<i32>,
+    /// Only bid on these domains (empty = all)
+    pub domain_allowlist: Vec<String>,
+    /// Never bid on these domains
+    pub domain_blocklist: Vec<String>,
+    /// Contextual keywords matched against site.keywords
+    pub keywords: Vec<String>,
+    /// Minimum age from user.yob (None = no constraint)
+    pub age_min: Option<i32>,
+    /// Maximum age from user.yob
+    pub age_max: Option<i32>,
 }
 
 #[derive(Debug, Clone)]
@@ -103,13 +113,18 @@ async fn load_active_campaigns(pg: &PgPool) -> anyhow::Result<Vec<CampaignRecord
             c.start_date,
             c.end_date,
             c.frequency_cap_daily,
-            COALESCE(t.geo_countries,   '{}') AS geo_countries,
-            COALESCE(t.device_types,    '{}') AS device_types,
-            COALESCE(t.os_types,        '{}') AS os_types,
-            COALESCE(t.site_categories, '{}') AS site_categories,
-            COALESCE(t.languages,       '{}') AS languages,
-            COALESCE(t.hours_of_day,    '{}') AS hours_of_day,
-            COALESCE(t.days_of_week,    '{}') AS days_of_week
+            COALESCE(t.geo_countries,    '{}') AS geo_countries,
+            COALESCE(t.device_types,     '{}') AS device_types,
+            COALESCE(t.os_types,         '{}') AS os_types,
+            COALESCE(t.site_categories,  '{}') AS site_categories,
+            COALESCE(t.languages,        '{}') AS languages,
+            COALESCE(t.hours_of_day,     '{}') AS hours_of_day,
+            COALESCE(t.days_of_week,     '{}') AS days_of_week,
+            COALESCE(t.domain_allowlist, '{}') AS domain_allowlist,
+            COALESCE(t.domain_blocklist, '{}') AS domain_blocklist,
+            COALESCE(t.keywords,         '{}') AS keywords,
+            t.age_min,
+            t.age_max
         FROM campaigns c
         JOIN campaign_targeting t ON t.campaign_id = c.id
         WHERE c.status = 'active'
@@ -134,13 +149,18 @@ async fn load_active_campaigns(pg: &PgPool) -> anyhow::Result<Vec<CampaignRecord
             end_date: row.try_get("end_date")?,
             frequency_cap_daily: row.try_get("frequency_cap_daily")?,
             targeting: TargetingRecord {
-                geo_countries: row.try_get("geo_countries")?,
-                device_types: row.try_get("device_types")?,
-                os_types: row.try_get("os_types")?,
+                geo_countries:   row.try_get("geo_countries")?,
+                device_types:    row.try_get("device_types")?,
+                os_types:        row.try_get("os_types")?,
                 site_categories: row.try_get("site_categories")?,
-                languages: row.try_get("languages")?,
-                hours_of_day: row.try_get("hours_of_day")?,
-                days_of_week: row.try_get("days_of_week")?,
+                languages:       row.try_get("languages")?,
+                hours_of_day:    row.try_get("hours_of_day")?,
+                days_of_week:    row.try_get("days_of_week")?,
+                domain_allowlist: row.try_get("domain_allowlist")?,
+                domain_blocklist: row.try_get("domain_blocklist")?,
+                keywords:         row.try_get("keywords")?,
+                age_min:          row.try_get("age_min")?,
+                age_max:          row.try_get("age_max")?,
             },
             creatives,
         });

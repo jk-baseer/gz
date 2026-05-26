@@ -61,6 +61,7 @@ fn basic_req() -> BidRequest {
             cat: Some(vec!["IAB13".into()]),
             page: None,
             referrer: None,
+            keywords: None,
             publisher: None,
             ext: None,
         }),

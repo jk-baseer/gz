@@ -52,6 +52,9 @@ dashmap = "5"
 config = "0.14"
 dotenvy = "0.15"
 base64 = "0.22"
+jsonwebtoken = "9"
+argon2 = "0.5"
+rand = "0.8"
 
 # Internal crates
 openrtb = { path = "crates/openrtb" }

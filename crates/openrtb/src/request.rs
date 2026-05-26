@@ -185,6 +185,8 @@ pub struct Site {
     #[serde(rename = "ref", skip_serializing_if = "Option::is_none")]
     pub referrer: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub publisher: Option<Publisher>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ext: Option<serde_json::Value>,
@@ -207,6 +209,8 @@ pub struct App {
     pub cat: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ver: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub publisher: Option<Publisher>,
     #[serde(skip_serializing_if = "Option::is_none")]

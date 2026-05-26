@@ -90,6 +90,16 @@ pub struct Targeting {
     pub hours_of_day: Vec<i32>,
     /// 0=Sunday…6=Saturday (empty = all days)
     pub days_of_week: Vec<i32>,
+    /// Only bid on these domains (empty = all domains)
+    pub domain_allowlist: Vec<String>,
+    /// Never bid on these domains
+    pub domain_blocklist: Vec<String>,
+    /// Contextual keywords matched against site.keywords in bid request (empty = all)
+    pub keywords: Vec<String>,
+    /// Minimum age (matched against user.yob when exchange provides it)
+    pub age_min: Option<i32>,
+    /// Maximum age
+    pub age_max: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +111,11 @@ pub struct UpdateTargetingRequest {
     pub languages: Option<Vec<String>>,
     pub hours_of_day: Option<Vec<i32>>,
     pub days_of_week: Option<Vec<i32>>,
+    pub domain_allowlist: Option<Vec<String>>,
+    pub domain_blocklist: Option<Vec<String>>,
+    pub keywords: Option<Vec<String>>,
+    pub age_min: Option<i32>,
+    pub age_max: Option<i32>,
 }
 
 // ── Creative ──────────────────────────────────────────────────────────────────

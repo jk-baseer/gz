@@ -116,14 +116,89 @@
         <!-- Targeting -->
         <div>
           <h4 class="section-title">Targeting</h4>
-          <div class="space-y-2">
-            <div><label class="label">Geo (ISO-3: ARE, SAU, KWT…)</label><input x-model="tgt.geo_countries_str" type="text" class="input mt-1"/></div>
-            <div><label class="label">Devices (mobile, desktop, tablet)</label><input x-model="tgt.device_types_str" type="text" class="input mt-1"/></div>
-            <div><label class="label">OS (ios, android, windows, macos)</label><input x-model="tgt.os_types_str" type="text" class="input mt-1"/></div>
-            <div><label class="label">Languages (ar, en)</label><input x-model="tgt.languages_str" type="text" class="input mt-1"/></div>
-            <div><label class="label">IAB Categories (IAB13, IAB19)</label><input x-model="tgt.site_categories_str" type="text" class="input mt-1"/></div>
+          <div class="space-y-3">
+
+            <!-- Basic audience -->
+            <div><label class="label">Geo — ISO-3 codes, comma-separated (ARE, SAU, KWT…)</label><input x-model="tgt.geo_countries_str" type="text" placeholder="leave blank = all countries" class="input mt-1"/></div>
+            <div><label class="label">Devices — comma-separated (mobile, desktop, tablet)</label><input x-model="tgt.device_types_str" type="text" placeholder="leave blank = all devices" class="input mt-1"/></div>
+            <div><label class="label">OS — comma-separated (ios, android, windows, macos)</label><input x-model="tgt.os_types_str" type="text" placeholder="leave blank = all OSes" class="input mt-1"/></div>
+            <div><label class="label">Languages — BCP-47, comma-separated (ar, en)</label><input x-model="tgt.languages_str" type="text" placeholder="leave blank = all languages" class="input mt-1"/></div>
+
+            <!-- Age range -->
+            <div>
+              <label class="label">Age Range <span class="text-gray-400 font-normal">(best-effort — only applied when exchange sends birth year)</span></label>
+              <div class="flex gap-2 mt-1">
+                <input x-model.number="tgt.age_min" type="number" min="13" max="100" placeholder="Min age" class="input w-1/2"/>
+                <input x-model.number="tgt.age_max" type="number" min="13" max="100" placeholder="Max age" class="input w-1/2"/>
+              </div>
+            </div>
+
+            <!-- IAB Content Categories -->
+            <div>
+              <label class="label">IAB Content Categories <span class="text-gray-400 font-normal">(leave all unchecked = any category)</span></label>
+              <input x-model="tgt.catFilter" type="text" placeholder="Filter categories…" class="input mt-1 mb-2"/>
+              <div class="border rounded p-2 max-h-40 overflow-y-auto grid grid-cols-2 gap-1">
+                <template x-for="cat in iabCats.filter(c=>!tgt.catFilter||c.label.toLowerCase().includes(tgt.catFilter.toLowerCase())||c.code.toLowerCase().includes(tgt.catFilter.toLowerCase()))" :key="cat.code">
+                  <label class="flex items-center gap-1 text-xs cursor-pointer select-none">
+                    <input type="checkbox" :value="cat.code" x-model="tgt.site_categories" class="rounded text-indigo-600"/>
+                    <span x-text="cat.label"></span>
+                    <span class="text-gray-400" x-text="'('+cat.code+')'"></span>
+                  </label>
+                </template>
+              </div>
+              <p x-show="tgt.site_categories.length" class="text-xs text-indigo-600 mt-1" x-text="'Selected: '+tgt.site_categories.join(', ')"></p>
+            </div>
+
+            <!-- Domain allowlist -->
+            <div>
+              <label class="label">Domain Allowlist <span class="text-gray-400 font-normal">(only bid on these domains — leave empty = all)</span></label>
+              <div class="flex gap-2 mt-1">
+                <input x-model="tgt._domainAllow" @keydown.enter.prevent="tgt._domainAllow.trim()&&(tgt.domain_allowlist.push(tgt._domainAllow.trim()),tgt._domainAllow='')" type="text" placeholder="e.g. example.com (press Enter to add)" class="input flex-1"/>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-1" x-show="tgt.domain_allowlist.length">
+                <template x-for="(d,i) in tgt.domain_allowlist" :key="i">
+                  <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 rounded px-2 py-0.5 text-xs">
+                    <span x-text="d"></span>
+                    <button @click="tgt.domain_allowlist.splice(i,1)" class="text-green-600 hover:text-green-900 leading-none">&times;</button>
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <!-- Domain blocklist -->
+            <div>
+              <label class="label">Domain Blocklist <span class="text-gray-400 font-normal">(never bid on these)</span></label>
+              <div class="flex gap-2 mt-1">
+                <input x-model="tgt._domainBlock" @keydown.enter.prevent="tgt._domainBlock.trim()&&(tgt.domain_blocklist.push(tgt._domainBlock.trim()),tgt._domainBlock='')" type="text" placeholder="e.g. competitor.com (press Enter to add)" class="input flex-1"/>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-1" x-show="tgt.domain_blocklist.length">
+                <template x-for="(d,i) in tgt.domain_blocklist" :key="i">
+                  <span class="inline-flex items-center gap-1 bg-red-100 text-red-800 rounded px-2 py-0.5 text-xs">
+                    <span x-text="d"></span>
+                    <button @click="tgt.domain_blocklist.splice(i,1)" class="text-red-600 hover:text-red-900 leading-none">&times;</button>
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <!-- Keywords -->
+            <div>
+              <label class="label">Contextual Keywords <span class="text-gray-400 font-normal">(bid on pages containing any of these — best-effort)</span></label>
+              <div class="flex gap-2 mt-1">
+                <input x-model="tgt._kw" @keydown.enter.prevent="tgt._kw.trim()&&(tgt.keywords.push(tgt._kw.trim()),tgt._kw='')" type="text" placeholder="e.g. fleet, logistics, ERP (press Enter to add)" class="input flex-1"/>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-1" x-show="tgt.keywords.length">
+                <template x-for="(kw,i) in tgt.keywords" :key="i">
+                  <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 rounded px-2 py-0.5 text-xs">
+                    <span x-text="kw"></span>
+                    <button @click="tgt.keywords.splice(i,1)" class="text-indigo-600 hover:text-indigo-900 leading-none">&times;</button>
+                  </span>
+                </template>
+              </div>
+            </div>
+
           </div>
-          <button @click="saveTargeting()" class="btn-sm btn-indigo mt-3">Save Targeting</button>
+          <button @click="saveTargeting()" class="btn-sm btn-indigo mt-4">Save Targeting</button>
         </div>
 
         <!-- Creatives -->
@@ -299,7 +374,27 @@ function app() {
 
     nc:  { name:'', bid_price_cpm_cents:200, budget_total_cents:10000, budget_daily_cents:null, frequency_cap_daily:null },
     nc2: { format:'banner', asset_url:'', click_url:'', width:null, height:null, title_text:'', description:'', cta_text:'', sponsored_by:'' },
-    tgt: { geo_countries_str:'', device_types_str:'', os_types_str:'', languages_str:'', site_categories_str:'' },
+    tgt: {
+      geo_countries_str:'', device_types_str:'', os_types_str:'', languages_str:'',
+      site_categories:[], catFilter:'',
+      domain_allowlist:[], domain_blocklist:[], keywords:[],
+      age_min:null, age_max:null,
+      _domainAllow:'', _domainBlock:'', _kw:'',
+    },
+    iabCats: [
+      {code:'IAB1',  label:'Arts & Entertainment'}, {code:'IAB2',  label:'Automotive'},
+      {code:'IAB3',  label:'Business'},             {code:'IAB4',  label:'Careers'},
+      {code:'IAB5',  label:'Education'},            {code:'IAB6',  label:'Family & Parenting'},
+      {code:'IAB7',  label:'Health & Fitness'},     {code:'IAB8',  label:'Food & Drink'},
+      {code:'IAB9',  label:'Hobbies & Interests'},  {code:'IAB10', label:'Home & Garden'},
+      {code:'IAB11', label:'Law & Government'},      {code:'IAB12', label:'News'},
+      {code:'IAB13', label:'Personal Finance'},      {code:'IAB14', label:'Society'},
+      {code:'IAB15', label:'Science'},              {code:'IAB16', label:'Pets'},
+      {code:'IAB17', label:'Sports'},               {code:'IAB18', label:'Style & Fashion'},
+      {code:'IAB19', label:'Technology & Computing'},{code:'IAB20', label:'Travel'},
+      {code:'IAB21', label:'Real Estate'},          {code:'IAB22', label:'Shopping'},
+      {code:'IAB23', label:'Religion & Spirituality'},{code:'IAB24', label:'Uncategorized'},
+    ],
     topupAmount: 50, walletError: '',
 
     async init() { if (this.token) await this.loadCampaigns(); },
@@ -379,11 +474,18 @@ function app() {
       if (tr.ok) {
         const t = await tr.json();
         this.tgt = {
-          geo_countries_str:   (t.geo_countries||[]).join(','),
-          device_types_str:    (t.device_types||[]).join(','),
-          os_types_str:        (t.os_types||[]).join(','),
-          languages_str:       (t.languages||[]).join(','),
-          site_categories_str: (t.site_categories||[]).join(','),
+          geo_countries_str: (t.geo_countries||[]).join(','),
+          device_types_str:  (t.device_types||[]).join(','),
+          os_types_str:      (t.os_types||[]).join(','),
+          languages_str:     (t.languages||[]).join(','),
+          site_categories:   t.site_categories||[],
+          catFilter:         '',
+          domain_allowlist:  t.domain_allowlist||[],
+          domain_blocklist:  t.domain_blocklist||[],
+          keywords:          t.keywords||[],
+          age_min:           t.age_min||null,
+          age_max:           t.age_max||null,
+          _domainAllow:'', _domainBlock:'', _kw:'',
         };
       }
 
@@ -415,11 +517,16 @@ function app() {
 
     async saveTargeting() {
       const body = {
-        geo_countries:   this.tgt.geo_countries_str.split(',').map(s=>s.trim()).filter(Boolean),
-        device_types:    this.tgt.device_types_str.split(',').map(s=>s.trim()).filter(Boolean),
-        os_types:        this.tgt.os_types_str.split(',').map(s=>s.trim()).filter(Boolean),
-        languages:       this.tgt.languages_str.split(',').map(s=>s.trim()).filter(Boolean),
-        site_categories: this.tgt.site_categories_str.split(',').map(s=>s.trim()).filter(Boolean),
+        geo_countries:    this.tgt.geo_countries_str.split(',').map(s=>s.trim()).filter(Boolean),
+        device_types:     this.tgt.device_types_str.split(',').map(s=>s.trim()).filter(Boolean),
+        os_types:         this.tgt.os_types_str.split(',').map(s=>s.trim()).filter(Boolean),
+        languages:        this.tgt.languages_str.split(',').map(s=>s.trim()).filter(Boolean),
+        site_categories:  this.tgt.site_categories,
+        domain_allowlist: this.tgt.domain_allowlist,
+        domain_blocklist: this.tgt.domain_blocklist,
+        keywords:         this.tgt.keywords,
+        age_min:          this.tgt.age_min || null,
+        age_max:          this.tgt.age_max || null,
       };
       await fetch(`/campaigns/${this.selectedCampaign.id}/targeting`, { method:'PUT', headers:this.hdr(), body:JSON.stringify(body) });
     },

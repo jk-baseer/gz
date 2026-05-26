@@ -135,6 +135,73 @@ pub fn matches(campaign: &CampaignRecord, req: &BidRequest, imp: &Imp) -> bool {
         // If no categories in request, don't block — some publishers don't send them
     }
 
+    // Domain allowlist — only bid on these specific domains
+    if !campaign.targeting.domain_allowlist.is_empty() {
+        let domain = req
+            .site.as_ref().and_then(|s| s.domain.as_deref())
+            .or_else(|| req.app.as_ref().and_then(|a| a.domain.as_deref()));
+        match domain {
+            Some(d) => {
+                if !campaign.targeting.domain_allowlist
+                    .iter()
+                    .any(|ad| d.to_lowercase().ends_with(ad.to_lowercase().trim_start_matches('.')))
+                {
+                    return false;
+                }
+            }
+            None => return false,
+        }
+    }
+
+    // Domain blocklist — never bid on these domains
+    if !campaign.targeting.domain_blocklist.is_empty() {
+        let domain = req
+            .site.as_ref().and_then(|s| s.domain.as_deref())
+            .or_else(|| req.app.as_ref().and_then(|a| a.domain.as_deref()));
+        if let Some(d) = domain {
+            if campaign.targeting.domain_blocklist
+                .iter()
+                .any(|bd| d.to_lowercase().ends_with(bd.to_lowercase().trim_start_matches('.')))
+            {
+                return false;
+            }
+        }
+    }
+
+    // Keyword contextual — at least one keyword must appear in site.keywords
+    if !campaign.targeting.keywords.is_empty() {
+        let page_keywords = req
+            .site.as_ref().and_then(|s| s.keywords.as_deref())
+            .or_else(|| req.app.as_ref().and_then(|a| a.keywords.as_deref()))
+            .unwrap_or("");
+        if !page_keywords.is_empty() {
+            let lower = page_keywords.to_lowercase();
+            let has_keyword = campaign.targeting.keywords
+                .iter()
+                .any(|kw| lower.contains(kw.to_lowercase().as_str()));
+            if !has_keyword {
+                return false;
+            }
+        }
+        // If exchange sends no keywords, don't block — keyword targeting is best-effort
+    }
+
+    // Age targeting — only when exchange provides user.yob
+    if campaign.targeting.age_min.is_some() || campaign.targeting.age_max.is_some() {
+        let yob = req.user.as_ref().and_then(|u| u.yob);
+        if let Some(birth_year) = yob {
+            let age = (chrono::Utc::now().format("%Y").to_string().parse::<i32>().unwrap_or(2026))
+                - birth_year as i32;
+            if let Some(min) = campaign.targeting.age_min {
+                if age < min { return false; }
+            }
+            if let Some(max) = campaign.targeting.age_max {
+                if age > max { return false; }
+            }
+        }
+        // If yob not provided by exchange, don't block — age targeting is best-effort
+    }
+
     // Must have a matching approved creative for this impression type
     if let Some(banner) = &imp.banner {
         let has_size = campaign.creatives.iter().filter(|c| c.format == "banner").any(|c| {
