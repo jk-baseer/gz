@@ -1,0 +1,198 @@
+# Production docker-compose.
+# Copy .env.example to .env and fill in all values before starting.
+#
+# First-time setup:
+#   docker compose -f docker/docker-compose.prod.yml up -d postgres redis
+#   docker compose -f docker/docker-compose.prod.yml run --rm certbot \
+#     certonly --webroot -w /var/www/certbot \
+#     -d bid.gz-ads.com -d app.gz-ads.com \
+#     --email your@email.com --agree-tos --no-eff-email
+#   docker compose -f docker/docker-compose.prod.yml up -d
+
+version: "3.9"
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "5"
+
+services:
+
+  # ── Databases ───────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    <<: [*restart, *logging]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-gz_ads}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gz}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    <<: [*restart, *logging]
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    <<: [*restart, *logging]
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ./clickhouse_schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ── Application services ───────────────────────────────────────────────────
+
+  bidder:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: bidder
+    image: gz-bidder:latest
+    <<: [*restart, *logging]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      BIDDER_HOST: 0.0.0.0
+      BIDDER_PORT: 8080
+      PUBLIC_HOSTNAME: ${BID_DOMAIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      JWT_SECRET: ${JWT_SECRET}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: gz
+    depends_on:
+      postgres:  { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  campaign-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: campaign-api
+    image: gz-api:latest
+    <<: [*restart, *logging]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      API_HOST: 0.0.0.0
+      API_PORT: 8081
+      PUBLIC_HOSTNAME: ${BID_DOMAIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      JWT_SECRET: ${JWT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: gz
+    depends_on:
+      postgres:  { condition: service_healthy }
+      redis:     { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  pacing:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: pacing
+    image: gz-pacing:latest
+    <<: [*restart, *logging]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      postgres:  { condition: service_healthy }
+      redis:     { condition: service_healthy }
+
+  event-consumer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        BIN: event-consumer
+    image: gz-events:latest
+    <<: [*restart, *logging]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-gz}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-gz_ads}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: gz
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Required by Config::load() even though event-consumer doesn't use them
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      PUBLIC_HOSTNAME: ${BID_DOMAIN}
+    depends_on:
+      postgres:   { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+
+  # ── Reverse proxy + SSL ────────────────────────────────────────────────────
+
+  nginx:
+    image: nginx:1.27-alpine
+    <<: [*restart, *logging]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/gz.conf:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - bidder
+      - campaign-api
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    # Run manually: docker compose run --rm certbot certonly ...
+    entrypoint: ["sh", "-c", "trap exit TERM; while :; do sleep 12h; certbot renew; done"]
+
+volumes:
+  pg_data:
+  redis_data:
+  ch_data:
+  certbot_www:
+  certbot_certs:

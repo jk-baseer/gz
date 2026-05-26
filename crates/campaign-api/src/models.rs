@@ -187,6 +187,8 @@ pub struct CampaignReport {
     pub clicks: i64,
     pub ctr_pct: f64,
     pub avg_cpm_cents: i64,
+    pub conversions: i64,
+    pub conversion_value_cents: i64,
     pub daily: Vec<DailyStats>,
 }
 
@@ -196,4 +198,6 @@ pub struct DailyStats {
     pub impressions: i64,
     pub spend_cents: i64,
     pub clicks: i64,
+    pub conversions: i64,
+    pub conversion_value_cents: i64,
 }
