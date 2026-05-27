@@ -464,7 +464,7 @@ function app() {
 
     convPixel() {
       if (!this.selectedCampaign) return '';
-      const host = window.location.origin.replace('8081','8080');
+      const host = window.location.origin.replace(':8090',':8080').replace(':8081',':8080');
       return `<img src="${host}/conv/${this.selectedCampaign.id}?value=ORDER_VALUE_USD" width="1" height="1" style="display:none"/>`;
     },
 

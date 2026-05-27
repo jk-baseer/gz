@@ -16,6 +16,7 @@ use tracing::info;
 
 use state::AppState;
 
+static LANDING_HTML: &str = include_str!("landing.html");
 static DASHBOARD_HTML: &str = include_str!("dashboard.html");
 
 #[tokio::main]
@@ -39,8 +40,9 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState { pg, cfg, http });
 
     let app = Router::new()
-        // Dashboard UI
-        .route("/", get(dashboard))
+        // Pages
+        .route("/", get(landing))
+        .route("/app", get(dashboard))
         // Auth
         .route("/auth/register", post(routes::auth::register))
         .route("/auth/login", post(routes::auth::login))
@@ -100,6 +102,10 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+async fn landing() -> Html<&'static str> {
+    Html(LANDING_HTML)
 }
 
 async fn dashboard() -> Html<&'static str> {

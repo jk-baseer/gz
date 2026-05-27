@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GZ Ads — Programmatic Advertising for the GCC</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  body { font-family: 'Inter', sans-serif; }
+  .gradient-hero { background: linear-gradient(135deg, #0f0c29 0%, #1a1060 40%, #24243e 100%); }
+  .gradient-cta  { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+  .card-glow     { box-shadow: 0 0 0 1px rgba(99,102,241,0.15), 0 20px 40px rgba(0,0,0,0.2); }
+  .stat-num      { background: linear-gradient(135deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body class="bg-gray-950 text-white antialiased">
+
+<!-- ── Nav ────────────────────────────────────────────────────────────────── -->
+<nav class="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-gray-950/80 backdrop-blur-md">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg gradient-cta flex items-center justify-center text-white font-bold text-sm">GZ</div>
+      <span class="font-semibold text-white tracking-tight">GZ Ads</span>
+    </div>
+    <div class="hidden md:flex items-center gap-8 text-sm text-gray-400">
+      <a href="#features" class="hover:text-white transition">Features</a>
+      <a href="#how-it-works" class="hover:text-white transition">How it works</a>
+      <a href="#exchange" class="hover:text-white transition">For exchanges</a>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/app" class="text-sm text-gray-400 hover:text-white transition">Sign in</a>
+      <a href="/app" class="text-sm bg-indigo-600 hover:bg-indigo-500 transition text-white px-4 py-2 rounded-lg font-medium">Get started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────────── -->
+<section class="gradient-hero min-h-screen flex items-center pt-20">
+  <div class="max-w-6xl mx-auto px-6 py-28 text-center">
+
+    <div class="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 text-xs text-indigo-300 mb-8 font-medium">
+      <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+      OpenRTB 2.6 · Sub-100ms · GCC-native
+    </div>
+
+    <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight mb-6 text-white">
+      Programmatic advertising<br/>
+      <span class="stat-num">built for the Gulf</span>
+    </h1>
+
+    <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+      GZ Ads is a self-serve DSP that puts GCC brands in front of the right audiences — across UAE, Saudi Arabia, Kuwait, Qatar, Bahrain, and Oman — with no minimums, no account managers, and no waiting.
+    </p>
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
+      <a href="/app" class="w-full sm:w-auto gradient-cta text-white font-semibold px-8 py-4 rounded-xl text-base hover:opacity-90 transition shadow-lg shadow-indigo-500/20">
+        Launch your first campaign
+      </a>
+      <a href="#how-it-works" class="w-full sm:w-auto border border-white/10 text-gray-300 hover:text-white hover:border-white/20 font-medium px-8 py-4 rounded-xl text-base transition">
+        See how it works
+      </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+        <p class="stat-num text-3xl font-bold">&lt;100ms</p>
+        <p class="text-gray-400 text-xs mt-1">Bid decision</p>
+      </div>
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+        <p class="stat-num text-3xl font-bold">6</p>
+        <p class="text-gray-400 text-xs mt-1">GCC markets</p>
+      </div>
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+        <p class="stat-num text-3xl font-bold">$0</p>
+        <p class="text-gray-400 text-xs mt-1">Minimum spend</p>
+      </div>
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+        <p class="stat-num text-3xl font-bold">RTB</p>
+        <p class="text-gray-400 text-xs mt-1">Real-time bidding</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ───────────────────────────────────────────────────────────── -->
+<section id="features" class="bg-gray-950 py-28">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Everything you need to run GCC campaigns</h2>
+      <p class="text-gray-400 max-w-xl mx-auto">Built by engineers, designed for advertisers. No black boxes — you control every targeting parameter.</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-7 card-glow">
+        <div class="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center mb-5 text-2xl">🎯</div>
+        <h3 class="font-semibold text-white mb-2">Precision targeting</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">Target by country, city, device, OS, language, IAB content category, domain, contextual keywords, and age range — all in one campaign.</p>
+      </div>
+
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-7 card-glow">
+        <div class="w-10 h-10 bg-violet-500/10 rounded-xl flex items-center justify-center mb-5 text-2xl">✦</div>
+        <h3 class="font-semibold text-white mb-2">AI campaign setup</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">Describe your audience in plain English — "B2B fleet management software, UAE and Saudi Arabia" — and the AI configures targeting for you.</p>
+      </div>
+
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-7 card-glow">
+        <div class="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-5 text-2xl">📊</div>
+        <h3 class="font-semibold text-white mb-2">Real-time reporting</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">Impressions, clicks, spend, CTR, and conversions — updated in real time. Daily breakdowns with conversion value attribution.</p>
+      </div>
+
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-7 card-glow">
+        <div class="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center mb-5 text-2xl">💰</div>
+        <h3 class="font-semibold text-white mb-2">Budget control</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">Set daily and total budgets. Real-time pacing prevents overspend. Frequency capping limits how often a user sees your ad per day.</p>
+      </div>
+
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-7 card-glow">
+        <div class="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center mb-5 text-2xl">🖼</div>
+        <h3 class="font-semibold text-white mb-2">Banner, native & video</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">Upload banner creatives in standard IAB sizes, native ad assets, or VAST video — all reviewed and ready to serve within minutes.</p>
+      </div>
+
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-7 card-glow">
+        <div class="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center mb-5 text-2xl">🔁</div>
+        <h3 class="font-semibold text-white mb-2">Conversion tracking</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">One-pixel tag on your thank-you page. Track purchases, sign-ups, and custom events. Attribute conversion value back to campaigns.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ───────────────────────────────────────────────────────── -->
+<section id="how-it-works" class="bg-gray-900 py-28">
+  <div class="max-w-4xl mx-auto px-6">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">From sign-up to live in minutes</h2>
+      <p class="text-gray-400">No sales calls. No 30-day wait. Your campaign is live the same day.</p>
+    </div>
+
+    <div class="space-y-6">
+
+      <div class="flex gap-6 items-start">
+        <div class="flex-shrink-0 w-10 h-10 gradient-cta rounded-full flex items-center justify-center font-bold text-sm text-white">1</div>
+        <div>
+          <h3 class="font-semibold text-white mb-1">Create your account</h3>
+          <p class="text-gray-400 text-sm">Register with your email and company name. No credit card needed to explore the platform.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-6 items-start">
+        <div class="flex-shrink-0 w-10 h-10 gradient-cta rounded-full flex items-center justify-center font-bold text-sm text-white">2</div>
+        <div>
+          <h3 class="font-semibold text-white mb-1">Describe your campaign with AI</h3>
+          <p class="text-gray-400 text-sm">Type your goal in plain English. The AI assistant sets geo, device, category, and keyword targeting instantly. Review and adjust anything.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-6 items-start">
+        <div class="flex-shrink-0 w-10 h-10 gradient-cta rounded-full flex items-center justify-center font-bold text-sm text-white">3</div>
+        <div>
+          <h3 class="font-semibold text-white mb-1">Upload creatives &amp; set budget</h3>
+          <p class="text-gray-400 text-sm">Add your banner, native, or video creative. Set a total and daily budget — even $100 gets you started. Creatives are reviewed within hours.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-6 items-start">
+        <div class="flex-shrink-0 w-10 h-10 gradient-cta rounded-full flex items-center justify-center font-bold text-sm text-white">4</div>
+        <div>
+          <h3 class="font-semibold text-white mb-1">Activate &amp; watch results</h3>
+          <p class="text-gray-400 text-sm">Hit Activate. Your bids go out across our exchange network in real time. Track impressions, clicks, and conversions as they happen.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="mt-12 text-center">
+      <a href="/app" class="gradient-cta text-white font-semibold px-8 py-4 rounded-xl text-base hover:opacity-90 transition inline-block shadow-lg shadow-indigo-500/20">
+        Start your first campaign
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── For exchanges ──────────────────────────────────────────────────────── -->
+<section id="exchange" class="bg-gray-950 py-28">
+  <div class="max-w-4xl mx-auto px-6">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold text-white mb-4">For exchange partners</h2>
+      <p class="text-gray-400 max-w-xl mx-auto">GZ Ads is an OpenRTB 2.6 compliant DSP seeking supply partnerships in the GCC and MENA region.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 mb-10">
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-6">
+        <h4 class="text-white font-semibold mb-3">Technical</h4>
+        <ul class="space-y-2 text-sm text-gray-400">
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> OpenRTB 2.6 — banner, native, video</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> Sub-100 ms bid response</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> Win notice via nurl / burl</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> 204 No Content on no-bid</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> 5,000+ QPS capacity</li>
+        </ul>
+      </div>
+      <div class="bg-gray-900 border border-white/5 rounded-2xl p-6">
+        <h4 class="text-white font-semibold mb-3">Commercial</h4>
+        <ul class="space-y-2 text-sm text-gray-400">
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> GCC-exclusive demand (high eCPMs)</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> USD billing, Net-30 or prepay</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> Brand-safe campaigns only</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> No adult, no gambling</li>
+          <li class="flex gap-2"><span class="text-indigo-400">✓</span> Operated by Istrata Digital Sdn Bhd</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="bg-indigo-500/5 border border-indigo-500/20 rounded-2xl p-8 text-center">
+      <p class="text-white font-medium mb-2">Interested in a supply partnership?</p>
+      <p class="text-gray-400 text-sm mb-5">We are actively integrating with SSPs serving GCC inventory. Fast technical onboarding — typically 24–48 hours.</p>
+      <a href="mailto:jk@istrata.co?subject=SSP Partnership — GZ Ads" class="gradient-cta text-white font-semibold px-6 py-3 rounded-lg text-sm hover:opacity-90 transition inline-block">
+        Contact partnerships
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer class="bg-gray-950 border-t border-white/5 py-12">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-md gradient-cta flex items-center justify-center text-white font-bold text-xs">GZ</div>
+      <span>GZ Ads</span>
+      <span class="text-gray-700">·</span>
+      <span>Operated by Istrata Digital Sdn Bhd</span>
+    </div>
+    <div class="flex items-center gap-6">
+      <a href="/app" class="hover:text-gray-300 transition">Advertiser portal</a>
+      <a href="mailto:jk@istrata.co" class="hover:text-gray-300 transition">jk@istrata.co</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
