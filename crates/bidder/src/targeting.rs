@@ -2,6 +2,7 @@ use chrono::Utc;
 use openrtb::{BidRequest, Imp};
 
 use crate::index::CampaignRecord;
+use rand;
 
 /// Returns true if the campaign should bid on this impression.
 pub fn matches(campaign: &CampaignRecord, req: &BidRequest, imp: &Imp) -> bool {
@@ -246,37 +247,61 @@ pub fn device_type_str(dt: u32) -> String {
     }
 }
 
-pub fn pick_creative<'a>(
+/// Returns all approved creatives that match the impression type and size.
+fn collect_matching_creatives<'a>(
     campaign: &'a CampaignRecord,
     imp: &Imp,
-) -> Option<&'a crate::index::CreativeRecord> {
-    if imp.banner.is_some() {
+) -> Vec<&'a crate::index::CreativeRecord> {
+    if let Some(banner) = &imp.banner {
         campaign
             .creatives
             .iter()
             .filter(|c| c.format == "banner")
-            .find(|c| {
-                if let Some(banner) = &imp.banner {
-                    let (cw, ch) = match (c.width, c.height) {
-                        (Some(w), Some(h)) => (w as u32, h as u32),
-                        _ => return true,
-                    };
-                    if let Some(formats) = &banner.format {
-                        formats.iter().any(|f| f.w == cw && f.h == ch)
-                    } else {
-                        banner.w.map_or(true, |bw| bw == cw)
-                            && banner.h.map_or(true, |bh| bh == ch)
-                    }
+            .filter(|c| {
+                let (cw, ch) = match (c.width, c.height) {
+                    (Some(w), Some(h)) => (w as u32, h as u32),
+                    _ => return true, // no size constraint on creative
+                };
+                if let Some(formats) = &banner.format {
+                    formats.iter().any(|f| f.w == cw && f.h == ch)
                 } else {
-                    false
+                    banner.w.map_or(true, |bw| bw == cw)
+                        && banner.h.map_or(true, |bh| bh == ch)
                 }
             })
+            .collect()
     } else if imp.native.is_some() {
-        // Pick the first approved native creative
-        campaign.creatives.iter().find(|c| c.format == "native")
+        campaign.creatives.iter().filter(|c| c.format == "native").collect()
     } else if imp.video.is_some() {
-        campaign.creatives.iter().find(|c| c.format == "video")
+        campaign.creatives.iter().filter(|c| c.format == "video").collect()
     } else {
-        None
+        vec![]
     }
+}
+
+/// Picks a creative using weighted random selection on `serving_probability`.
+/// Probabilities are pre-computed by the optimizer (Thompson Sampling bandit).
+/// New creatives default to probability 1.0 — equal exploration until optimizer runs.
+pub fn pick_creative<'a>(
+    campaign: &'a CampaignRecord,
+    imp: &Imp,
+) -> Option<&'a crate::index::CreativeRecord> {
+    let candidates = collect_matching_creatives(campaign, imp);
+    if candidates.is_empty() {
+        return None;
+    }
+    if candidates.len() == 1 {
+        return Some(candidates[0]);
+    }
+
+    // Weighted random selection proportional to serving_probability
+    let total: f64 = candidates.iter().map(|c| c.serving_probability).sum();
+    let mut r = rand::random::<f64>() * total;
+    for c in &candidates {
+        r -= c.serving_probability;
+        if r <= 0.0 {
+            return Some(c);
+        }
+    }
+    candidates.last().copied()
 }

@@ -86,8 +86,9 @@ async fn main() -> anyhow::Result<()> {
             get(routes::exchanges::get_one).put(routes::exchanges::update),
         )
         .route("/exchanges/stats", get(routes::exchanges::stats))
-        // AI campaign assistant
+        // AI campaign assistant + creative optimizer
         .route("/campaigns/ai-suggest", post(routes::ai_suggest::suggest))
+        .route("/campaigns/:campaign_id/creatives/:creative_id/variants", post(routes::variants::generate))
         // Billing (Stripe)
         .route("/billing/checkout", post(routes::billing::checkout))
         .route("/billing/webhook", post(routes::billing::webhook))

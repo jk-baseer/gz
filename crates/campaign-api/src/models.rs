@@ -137,6 +137,14 @@ pub struct Creative {
     pub cta_text: Option<String>,
     pub sponsored_by: Option<String>,
     pub created_at: DateTime<Utc>,
+    // Optimizer fields
+    pub parent_creative_id: Option<Uuid>,
+    pub variant_hypothesis: Option<String>,
+    // Live stats (joined from event tables)
+    #[sqlx(default)]
+    pub impressions: i64,
+    #[sqlx(default)]
+    pub clicks: i64,
 }
 
 #[derive(Debug, Deserialize)]

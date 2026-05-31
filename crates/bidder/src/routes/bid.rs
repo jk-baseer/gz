@@ -146,13 +146,7 @@ pub async fn handle(
         );
 
         let ad_markup = if imp.banner.is_some() {
-            banner_markup(
-                &creative.asset_url,
-                &tok,
-                &state.cfg.public_hostname,
-                creative.width,
-                creative.height,
-            )
+            banner_markup(creative, &tok, &state.cfg.public_hostname)
         } else if imp.native.is_some() {
             native_markup(creative, &tok, &state.cfg.public_hostname)
         } else {
@@ -257,17 +251,25 @@ fn native_markup(
 }
 
 fn banner_markup(
-    asset_url: &str,
+    creative: &bidder::index::CreativeRecord,
     token: &str,
     hostname: &str,
-    w: Option<i32>,
-    h: Option<i32>,
 ) -> String {
     let click_url = format!("https://{hostname}/click/{token}");
-    let imp_url = format!("https://{hostname}/imp/{token}");
-    let width = w.unwrap_or(0);
-    let height = h.unwrap_or(0);
+    let imp_url   = format!("https://{hostname}/imp/{token}");
+
+    // AI-generated HTML5 variant: inject tracking URLs and serve directly
+    if let Some(html) = &creative.html_adm {
+        return html
+            .replace("{{CLICK_URL}}", &click_url)
+            .replace("{{IMP_URL}}",   &imp_url);
+    }
+
+    // Legacy image banner
+    let width  = creative.width.unwrap_or(0);
+    let height = creative.height.unwrap_or(0);
     format!(
-        r#"<a href="{click_url}" target="_blank" rel="noopener"><img src="{asset_url}" width="{width}" height="{height}" border="0" alt="Advertisement"/></a><img src="{imp_url}" width="1" height="1" border="0" style="display:none" alt=""/>"#
+        r#"<a href="{click_url}" target="_blank" rel="noopener"><img src="{asset_url}" width="{width}" height="{height}" border="0" alt="Advertisement"/></a><img src="{imp_url}" width="1" height="1" border="0" style="display:none" alt=""/>"#,
+        asset_url = creative.asset_url,
     )
 }

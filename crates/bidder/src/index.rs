@@ -61,6 +61,12 @@ pub struct CreativeRecord {
     pub description: Option<String>,
     pub cta_text: Option<String>,
     pub sponsored_by: Option<String>,
+    /// HTML5 banner markup with {{CLICK_URL}} / {{IMP_URL}} placeholders.
+    /// When set, used directly as the bid response adm instead of the default image banner.
+    pub html_adm: Option<String>,
+    /// Allocation probability computed by the optimizer (Thompson Sampling).
+    /// Default 1.0 for new creatives with no optimizer data yet.
+    pub serving_probability: f64,
 }
 
 pub struct CampaignIndex {
@@ -172,10 +178,12 @@ async fn load_active_campaigns(pg: &PgPool) -> anyhow::Result<Vec<CampaignRecord
 async fn load_creatives(pg: &PgPool, campaign_id: Uuid) -> anyhow::Result<Vec<CreativeRecord>> {
     let rows = sqlx::query(
         r#"
-        SELECT id, format, width, height, asset_url, click_url,
-               title_text, description, cta_text, sponsored_by
-        FROM creatives
-        WHERE campaign_id = $1 AND status = 'approved'
+        SELECT c.id, c.format, c.width, c.height, c.asset_url, c.click_url,
+               c.title_text, c.description, c.cta_text, c.sponsored_by, c.html_adm,
+               COALESCE(sw.serving_probability, 1.0) AS serving_probability
+        FROM creatives c
+        LEFT JOIN creative_serving_weights sw ON sw.creative_id = c.id
+        WHERE c.campaign_id = $1 AND c.status = 'approved'
         "#,
     )
     .bind(campaign_id)
@@ -195,6 +203,8 @@ async fn load_creatives(pg: &PgPool, campaign_id: Uuid) -> anyhow::Result<Vec<Cr
                 description: r.try_get("description")?,
                 cta_text: r.try_get("cta_text")?,
                 sponsored_by: r.try_get("sponsored_by")?,
+                html_adm: r.try_get("html_adm")?,
+                serving_probability: r.try_get("serving_probability")?,
             })
         })
         .collect()

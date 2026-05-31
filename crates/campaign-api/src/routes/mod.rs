@@ -8,3 +8,4 @@ pub mod exchanges;
 pub mod health;
 pub mod reporting;
 pub mod targeting;
+pub mod variants;

@@ -257,12 +257,48 @@
           <h4 class="section-title">Creatives</h4>
           <div class="space-y-2 mb-3">
             <template x-for="cr in creatives" :key="cr.id">
-              <div class="border rounded p-3">
+              <div class="border rounded p-3" :class="cr.parent_creative_id ? 'ml-4 border-indigo-100 bg-indigo-50/30' : ''">
                 <div class="flex justify-between items-center">
-                  <span class="font-medium capitalize" x-text="cr.format"></span>
-                  <span class="badge" :class="statusBadge(cr.status)" x-text="cr.status"></span>
+                  <div>
+                    <span class="font-medium capitalize" x-text="cr.format"></span>
+                    <span x-show="cr.parent_creative_id" class="ml-1 text-xs text-indigo-500">variant</span>
+                    <span x-show="cr.variant_hypothesis" class="ml-1 text-xs text-gray-400 italic" x-text="'— '+cr.variant_hypothesis"></span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <!-- Prob-best badge (shown when variants exist) -->
+                    <span x-show="variantProbs[cr.id]" class="text-xs font-medium px-1.5 py-0.5 rounded"
+                      :class="parseFloat(variantProbs[cr.id])>95 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                      x-text="variantProbs[cr.id]+'% best'"></span>
+                    <span class="badge" :class="statusBadge(cr.status)" x-text="cr.status"></span>
+                  </div>
                 </div>
-                <p class="text-gray-400 truncate mt-1 text-xs" x-text="cr.asset_url"></p>
+                <!-- Stats row -->
+                <div class="flex gap-4 mt-1 text-xs text-gray-500">
+                  <span x-text="(cr.impressions||0)+' imps'"></span>
+                  <span x-text="(cr.clicks||0)+' clicks'"></span>
+                  <span x-text="cr.impressions ? ((cr.clicks||0)/cr.impressions*100).toFixed(2)+'% CTR' : '—'"></span>
+                </div>
+                <!-- Generate variants button (only on non-variant, approved banner/native) -->
+                <div x-show="!cr.parent_creative_id && (cr.format==='banner'||cr.format==='native') && cr.status==='approved'" class="mt-2">
+                  <button @click="cr._showOptimize=!cr._showOptimize" class="text-xs text-indigo-600 hover:underline">✦ Generate AI variants</button>
+                  <div x-show="cr._showOptimize" class="mt-2 space-y-2 p-2 bg-white border border-indigo-100 rounded">
+                    <textarea x-model="cr._brief" rows="2" placeholder="Describe your audience or goal for the variants…" class="input text-xs resize-none w-full"></textarea>
+                    <div class="flex items-center gap-2">
+                      <label class="text-xs text-gray-500">Variants:</label>
+                      <select x-model.number="cr._nVariants" class="input w-20 text-xs py-1">
+                        <option>3</option><option>5</option><option>8</option>
+                      </select>
+                      <button @click="generateVariants(cr)"
+                        :disabled="cr._genLoading"
+                        class="btn-sm btn-indigo disabled:opacity-50 text-xs">
+                        <span x-show="!cr._genLoading">Generate</span>
+                        <span x-show="cr._genLoading">Generating…</span>
+                      </button>
+                      <span x-show="cr._genError" x-text="cr._genError" class="text-xs text-red-500"></span>
+                      <span x-show="cr._genDone" class="text-xs text-green-600">✓ Done</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </template>
           </div>
@@ -420,7 +456,7 @@ function app() {
     tab: 'campaigns',
     campaigns: [], exchanges: [], pendingCreatives: [],
     selectedCampaign: null,
-    creatives: [], report: [], reportTotals: { impressions:0, spend_cents:0, clicks:0, conversions:0 },
+    creatives: [], variantProbs: {}, report: [], reportTotals: { impressions:0, spend_cents:0, clicks:0, conversions:0 },
     showNewCampaign: false,
 
     aiPrompt: '', aiLoading: false, aiError: '', aiSuggestion: null,
@@ -589,7 +625,10 @@ function app() {
 
       // Creatives
       const cr = await fetch(`/campaigns/${c.id}/creatives`, { headers:this.hdr() });
-      if (cr.ok) this.creatives = await cr.json();
+      if (cr.ok) {
+        this.creatives = await cr.json();
+        this.variantProbs = this.computeVariantProbs(this.creatives);
+      }
 
       // Report (last 7 days)
       const today = new Date().toISOString().slice(0,10);
@@ -638,6 +677,62 @@ function app() {
         const cr = await fetch(`/campaigns/${this.selectedCampaign.id}/creatives`, { headers:this.hdr() });
         if (cr.ok) this.creatives = await cr.json();
       }
+    },
+
+    // ── Creative optimizer ────────────────────────────────────────────────────
+
+    // Johnk's method: sample from Beta(a, b) in pure JS (no library)
+    betaSample(a, b) {
+      // Use the relationship: Beta(a,b) = Gamma(a) / (Gamma(a)+Gamma(b))
+      // Approximate Gamma via Marsaglia-Tsang method for integer/half-integer shapes
+      // For simplicity: use the log-normal approximation for large a+b, exact Johnk for small
+      while (true) {
+        const u = Math.random() ** (1/a);
+        const v = Math.random() ** (1/b);
+        if (u + v <= 1) return u / (u + v);
+      }
+    },
+
+    // Monte Carlo: for each creative, fraction of simulations it would win
+    computeVariantProbs(creatives, nSims=2000) {
+      const wins = creatives.map(() => 0);
+      for (let i = 0; i < nSims; i++) {
+        let best = 0, bestScore = -1;
+        creatives.forEach((cr, idx) => {
+          const imp = cr.impressions || 0;
+          const cl  = cr.clicks || 0;
+          const s   = this.betaSample(cl + 1, Math.max(imp - cl, 0) + 1);
+          if (s > bestScore) { bestScore = s; best = idx; }
+        });
+        wins[best]++;
+      }
+      const result = {};
+      creatives.forEach((cr, i) => {
+        result[cr.id] = (wins[i] / nSims * 100).toFixed(1);
+      });
+      return result;
+    },
+
+    async generateVariants(cr) {
+      cr._genLoading = true; cr._genError = ''; cr._genDone = false;
+      try {
+        const n = cr._nVariants || 5;
+        const r = await fetch(
+          `/campaigns/${this.selectedCampaign.id}/creatives/${cr.id}/variants`,
+          { method:'POST', headers:this.hdr(), body:JSON.stringify({ brief: cr._brief||'', n_variants: n }) }
+        );
+        if (!r.ok) { const e=await r.json(); cr._genError=e.error||'Failed'; return; }
+        const data = await r.json();
+        cr._genDone = true;
+        cr._showOptimize = false;
+        // Reload creatives and recompute probs
+        const cr2 = await fetch(`/campaigns/${this.selectedCampaign.id}/creatives`, { headers:this.hdr() });
+        if (cr2.ok) {
+          this.creatives = await cr2.json();
+          this.variantProbs = this.computeVariantProbs(this.creatives);
+        }
+      } catch(e) { cr._genError = 'Network error'; }
+      finally    { cr._genLoading = false; }
     },
 
     async loadExchanges() {

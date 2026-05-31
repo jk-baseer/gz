@@ -50,7 +50,18 @@ pub async fn list(
     Path(campaign_id): Path<Uuid>,
 ) -> impl IntoResponse {
     let result = sqlx::query_as::<_, Creative>(
-        "SELECT * FROM creatives WHERE campaign_id = $1 ORDER BY created_at DESC",
+        r#"
+        SELECT c.*,
+               COALESCE(i.impressions, 0) AS impressions,
+               COALESCE(cl.clicks, 0)    AS clicks
+        FROM creatives c
+        LEFT JOIN (SELECT creative_id, COUNT(*)::BIGINT AS impressions FROM impression_events GROUP BY creative_id) i
+               ON i.creative_id = c.id
+        LEFT JOIN (SELECT creative_id, COUNT(*)::BIGINT AS clicks FROM click_events GROUP BY creative_id) cl
+               ON cl.creative_id = c.id
+        WHERE c.campaign_id = $1
+        ORDER BY c.created_at DESC
+        "#,
     )
     .bind(campaign_id)
     .fetch_all(&state.pg)

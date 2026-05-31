@@ -4,6 +4,7 @@ members = [
     "crates/common",
     "crates/bidder",
     "crates/campaign-api",
+    "crates/optimizer",
     "crates/pacing",
     "crates/reporting",
     "crates/event-consumer",
@@ -55,6 +56,7 @@ base64 = "0.22"
 jsonwebtoken = "9"
 argon2 = "0.5"
 rand = "0.8"
+rand_distr = "0.4"
 
 # Internal crates
 openrtb = { path = "crates/openrtb" }

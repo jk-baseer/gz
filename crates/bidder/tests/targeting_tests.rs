@@ -27,6 +27,8 @@ fn campaign(targeting: TargetingRecord) -> CampaignRecord {
             description: None,
             cta_text: None,
             sponsored_by: None,
+            html_adm: None,
+            serving_probability: 1.0,
         }],
     }
 }
